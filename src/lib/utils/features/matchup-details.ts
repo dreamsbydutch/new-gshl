@@ -17,6 +17,7 @@ import type { PlayerInjury } from "@gshl-lib/types/injuries";
 import { playerWeekPerformanceRating } from "../domain/player-week-rating";
 import { isCategoryImpactRating } from "./stat-rating";
 import type { MatchupCategoryConfig, TeamWeekStatLine } from "@gshl-types";
+import { matchupRosterForDate } from "./matchup-roster";
 import { normalizeDateOnlyValue } from "../core/date";
 import {
   formatPlayerPositionList,
@@ -116,15 +117,23 @@ export function getMatchupTodayGames(
     date: string;
     away: readonly MatchupPlayerDayRow[];
     home: readonly MatchupPlayerDayRow[];
+    currentAway?: readonly PlayerStatRow[];
+    currentHome?: readonly PlayerStatRow[];
   },
 ) {
   if (roster) {
-    awayPlayers = roster.away
-      .filter((p) => p.date === roster.date)
-      .map((p) => ({ ...p, currentNhlTeam: p.nhlTeam }));
-    homePlayers = roster.home
-      .filter((p) => p.date === roster.date)
-      .map((p) => ({ ...p, currentNhlTeam: p.nhlTeam }));
+    awayPlayers = matchupRosterForDate(
+      [],
+      roster.away,
+      roster.date,
+      roster.currentAway,
+    );
+    homePlayers = matchupRosterForDate(
+      [],
+      roster.home,
+      roster.date,
+      roster.currentHome,
+    );
   }
   const involvedPlayers = (
     players: readonly PlayerStatRow[],

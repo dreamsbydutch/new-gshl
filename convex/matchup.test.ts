@@ -49,6 +49,16 @@ function fixture(dayCount = 1) {
     ],
     players: [
       {
+        _id: "new-current",
+        gshlTeamId: "home",
+        fullName: "New Current",
+        firstName: "New",
+        lastName: "Current",
+        posGroup: "F",
+        nhlTeam: ["TOR"],
+        lineupPos: "IR",
+      },
+      {
         _id: "old",
         firstName: "Old",
         lastName: "Player",
@@ -124,6 +134,11 @@ function fixture(dayCount = 1) {
 void test("matchup payload includes dated day-only roster players, excludes other teams, and exposes bounded weekly ratings", async () => {
   const result = await read(fixture(), { matchupId: "m" });
   assert.equal(result.players.home[0]!.id, "old");
+  assert.deepEqual(
+    result.currentRosters?.home.map((p) => [p.id, p.dailyPos]),
+    [["new-current", "IR"]],
+  );
+  assert.equal(result.currentRosters?.away.length, 0);
   assert.ok(
     Number(result.players.home[0]!.Rating) > 90 &&
       Number(result.players.home[0]!.Rating) <= 100,

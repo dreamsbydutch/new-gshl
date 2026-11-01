@@ -30,6 +30,8 @@ export function useMatchupNHLGames(details: MatchupDetailsPayload) {
         date: schedule.selectedDay?.date ?? "",
         away: details.playerDays?.away ?? [],
         home: details.playerDays?.home ?? [],
+        currentAway: details.currentRosters?.away,
+        currentHome: details.currentRosters?.home,
       },
     ),
   };

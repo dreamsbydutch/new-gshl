@@ -33,6 +33,8 @@ import {
 } from "@gshl-utils";
 import Image from "next/image";
 import Link from "next/link";
+import { Fragment } from "react";
+import { groupMatchupPlayers } from "@gshl-utils/features/matchup-roster";
 
 export function PlayerStatsTable({
   matchup,
@@ -44,6 +46,7 @@ export function PlayerStatsTable({
   records = null,
   headline,
   seasonCategories,
+  currentRoster,
 }: {
   matchup: MatchupDetailsMatchup;
   week: MatchupDetailsWeek | null;
@@ -54,6 +57,7 @@ export function PlayerStatsTable({
   records?: MatchupRecords | null;
   headline?: string;
   seasonCategories?: readonly string[];
+  currentRoster?: PlayerStatRow[];
 }) {
   const table = useMatchupPlayerTable({
     matchup,
@@ -61,6 +65,7 @@ export function PlayerStatsTable({
     players,
     playerDays,
     categories: seasonCategories,
+    currentRoster,
   });
   const injuryReport = useInjuryReport();
   const injuries = injuryReport.data?.injuries ?? [];
@@ -76,12 +81,16 @@ export function PlayerStatsTable({
     })),
     injuries,
   );
-  const activePlayers = playersByInjury.filter(
-    (player) => !matchupPlayerInjuryDesignation(player, injuries),
+  const groups = groupMatchupPlayers(
+    playersByInjury,
+    table.isActive ? table.roster : playersByInjury,
+    (player) => Boolean(matchupPlayerInjuryDesignation(player, injuries)),
   );
-  const injuredPlayers = playersByInjury.filter((player) =>
-    Boolean(matchupPlayerInjuryDesignation(player, injuries)),
+  const activeGroups = groups.filter(
+    (group) => group.label !== "Injured / inactive",
   );
+  const injuredPlayers =
+    groups.find((group) => group.label === "Injured / inactive")?.players ?? [];
   const { schedule, isActive, columns } = table;
   const tableColumns: (
     | PlayerStatColumn
@@ -182,7 +191,8 @@ export function PlayerStatsTable({
           </div>
         </div>
         <div className="shrink-0 text-xs uppercase tracking-[0.14em] text-slate-500 sm:tracking-[0.18em]">
-          {players.length} {players.length === 1 ? "Player" : "Players"}
+          {table.players.length}{" "}
+          {table.players.length === 1 ? "Player" : "Players"}
         </div>
       </div>
 
@@ -307,142 +317,160 @@ export function PlayerStatsTable({
               </tr>
             ) : (
               <>
-                {activePlayers.map((player) => (
-                  <tr
-                    key={player.id}
-                    className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50/60" : "odd:bg-white even:bg-slate-50/70"}`}
-                  >
-                    {tableColumns.map((column) => {
-                      if (column.key === "today")
-                        return (
-                          <td
-                            key="today"
-                            className={getColumnClassName("today")}
-                          >
-                            {schedule.isLoading ? (
-                              <span className="text-slate-400">Loading…</span>
-                            ) : table.hasToday &&
-                              !table.todayIds.has(player.id) ? (
-                              <span className="text-[10px] text-slate-400">
-                                Off roster today
-                              </span>
-                            ) : !schedule.data ? (
-                              <span className="text-slate-400">
-                                Unavailable
-                              </span>
-                            ) : !schedule.data.published ? (
-                              <span className="text-slate-400">
-                                Not scheduled
-                              </span>
-                            ) : getPlayerTodayGames(player, schedule.games)
-                                .length === 0 ? (
-                              <span
-                                aria-label="No game today"
-                                className="text-slate-400"
-                              >
-                                —
-                              </span>
-                            ) : (
-                              getPlayerTodayGames(player, schedule.games).map(
-                                (game) => (
-                                  <Link
-                                    key={game.id}
-                                    href={`/nhl/matchup/${game.id}`}
-                                    prefetch={false}
-                                    aria-label={`${formatMatchupPlayerName(player)}: ${game.awayTeam.abbrev} at ${game.homeTeam.abbrev}. ${nhlGameStatus(game)}. View NHL matchup.`}
-                                    title={`${game.awayTeam.abbrev} at ${game.homeTeam.abbrev} · ${nhlGameStatus(game)}`}
-                                    className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-1 text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                  >
-                                    <NHLLogo
-                                      team={{
-                                        name: game.awayTeam.abbrev,
-                                        logoUrl: "",
-                                      }}
-                                      size={18}
-                                      className="!mx-0 shrink-0"
-                                    />
-                                    <span
-                                      aria-hidden="true"
-                                      className="text-[10px] text-slate-400"
-                                    >
-                                      @
-                                    </span>
-                                    <NHLLogo
-                                      team={{
-                                        name: game.homeTeam.abbrev,
-                                        logoUrl: "",
-                                      }}
-                                      size={18}
-                                      className="!mx-0 shrink-0"
-                                    />
-                                    <span className="ml-1 text-[10px] text-slate-500">
-                                      {nhlGameStatus(game)}
-                                      {typeof game.awayTeam.score ===
-                                        "number" &&
-                                      typeof game.homeTeam.score === "number"
-                                        ? ` · ${game.awayTeam.score}–${game.homeTeam.score}`
-                                        : ""}
-                                    </span>
-                                  </Link>
-                                ),
-                              )
-                            )}
-                          </td>
-                        );
-                      const cellClassName = [
-                        getColumnClassName(column.key, column.className),
-                        column.key === "player"
-                          ? "group-hover:bg-slate-100"
-                          : "",
-                      ].join(" ");
-                      const isTodayNonAppearance =
-                        table.view === "today" && Number(player.GP) <= 0;
-                      const isPlayerIdentityColumn =
-                        column.key === "player" ||
-                        column.key === "pos" ||
-                        column.key === "dailyPos";
-                      const content =
-                        table.view === "today" &&
-                        (!table.hasToday || isTodayNonAppearance) &&
-                        !isPlayerIdentityColumn
-                          ? "—"
-                          : renderPlayerStatCell(player, column.key);
-
-                      return column.key === "player" ? (
+                {activeGroups.map((group) => (
+                  <Fragment key={group.label}>
+                    {isActive ? (
+                      <tr>
                         <th
-                          key={`${player.id}-${column.key}`}
-                          scope="row"
-                          className={cellClassName}
-                          aria-label={formatMatchupPlayerName(player)}
+                          scope="rowgroup"
+                          colSpan={tableColumns.length}
+                          className="border-y border-slate-200 bg-slate-100 px-3 py-2 text-left text-xs font-semibold text-slate-600"
                         >
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            {renderNhlTeamCell(player)}
-                            <span
-                              className="truncate"
-                              title={formatMatchupPlayerName(player)}
-                            >
-                              {abbreviatePlayerName(content)}
-                            </span>
-                          </div>
+                          {group.label}
                         </th>
-                      ) : (
-                        <td
-                          key={`${player.id}-${column.key}`}
-                          className={cellClassName}
-                        >
-                          {content}
-                          {table.view === "week" && column.key !== "Rating" ? (
-                            <PerformanceRecordBadge
-                              records={records}
-                              entityId={(team?.id ?? "") + ":" + player.id}
-                              stat={column.key}
-                              value={content}
-                            />
-                          ) : null}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                      </tr>
+                    ) : null}
+                    {group.players.map((player) => (
+                      <tr
+                        key={player.id}
+                        className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50/60" : "odd:bg-white even:bg-slate-50/70"}`}
+                      >
+                        {tableColumns.map((column) => {
+                          if (column.key === "today")
+                            return (
+                              <td
+                                key="today"
+                                className={getColumnClassName("today")}
+                              >
+                                {schedule.isLoading ? (
+                                  <span className="text-slate-400">
+                                    Loading…
+                                  </span>
+                                ) : !table.rosterIds.has(player.id) ? (
+                                  <span className="text-[10px] text-slate-400">
+                                    Off roster today
+                                  </span>
+                                ) : !schedule.data ? (
+                                  <span className="text-slate-400">
+                                    Unavailable
+                                  </span>
+                                ) : !schedule.data.published ? (
+                                  <span className="text-slate-400">
+                                    Not scheduled
+                                  </span>
+                                ) : getPlayerTodayGames(player, schedule.games)
+                                    .length === 0 ? (
+                                  <span
+                                    aria-label="No game today"
+                                    className="text-slate-400"
+                                  >
+                                    —
+                                  </span>
+                                ) : (
+                                  getPlayerTodayGames(
+                                    player,
+                                    schedule.games,
+                                  ).map((game) => (
+                                    <Link
+                                      key={game.id}
+                                      href={`/nhl/matchup/${game.id}`}
+                                      prefetch={false}
+                                      aria-label={`${formatMatchupPlayerName(player)}: ${game.awayTeam.abbrev} at ${game.homeTeam.abbrev}. ${nhlGameStatus(game)}. View NHL matchup.`}
+                                      title={`${game.awayTeam.abbrev} at ${game.homeTeam.abbrev} · ${nhlGameStatus(game)}`}
+                                      className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-1 text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    >
+                                      <NHLLogo
+                                        team={{
+                                          name: game.awayTeam.abbrev,
+                                          logoUrl: "",
+                                        }}
+                                        size={18}
+                                        className="!mx-0 shrink-0"
+                                      />
+                                      <span
+                                        aria-hidden="true"
+                                        className="text-[10px] text-slate-400"
+                                      >
+                                        @
+                                      </span>
+                                      <NHLLogo
+                                        team={{
+                                          name: game.homeTeam.abbrev,
+                                          logoUrl: "",
+                                        }}
+                                        size={18}
+                                        className="!mx-0 shrink-0"
+                                      />
+                                      <span className="ml-1 text-[10px] text-slate-500">
+                                        {nhlGameStatus(game)}
+                                        {typeof game.awayTeam.score ===
+                                          "number" &&
+                                        typeof game.homeTeam.score === "number"
+                                          ? ` · ${game.awayTeam.score}–${game.homeTeam.score}`
+                                          : ""}
+                                      </span>
+                                    </Link>
+                                  ))
+                                )}
+                              </td>
+                            );
+                          const cellClassName = [
+                            getColumnClassName(column.key, column.className),
+                            column.key === "player"
+                              ? "group-hover:bg-slate-100"
+                              : "",
+                          ].join(" ");
+                          const isTodayNonAppearance =
+                            table.view === "today" && Number(player.GP) <= 0;
+                          const isPlayerIdentityColumn =
+                            column.key === "player" ||
+                            column.key === "pos" ||
+                            column.key === "dailyPos";
+                          const content =
+                            table.view === "today" &&
+                            (!table.hasToday || isTodayNonAppearance) &&
+                            !isPlayerIdentityColumn
+                              ? "—"
+                              : renderPlayerStatCell(player, column.key);
+
+                          return column.key === "player" ? (
+                            <th
+                              key={`${player.id}-${column.key}`}
+                              scope="row"
+                              className={cellClassName}
+                              aria-label={formatMatchupPlayerName(player)}
+                            >
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                {renderNhlTeamCell(player)}
+                                <span
+                                  className="truncate"
+                                  title={formatMatchupPlayerName(player)}
+                                >
+                                  {abbreviatePlayerName(content)}
+                                </span>
+                              </div>
+                            </th>
+                          ) : (
+                            <td
+                              key={`${player.id}-${column.key}`}
+                              className={cellClassName}
+                            >
+                              {content}
+                              {table.view === "week" &&
+                              column.key !== "Rating" ? (
+                                <PerformanceRecordBadge
+                                  records={records}
+                                  entityId={(team?.id ?? "") + ":" + player.id}
+                                  stat={column.key}
+                                  value={content}
+                                />
+                              ) : null}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
                 {injuredPlayers.length > 0 ? (
                   <tr className="border-y border-red-100 bg-red-50/70">
@@ -450,7 +478,7 @@ export function PlayerStatsTable({
                       colSpan={tableColumns.length}
                       className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700 sm:px-4 sm:text-xs"
                     >
-                      Injured players
+                      Injured / inactive
                     </td>
                   </tr>
                 ) : null}
