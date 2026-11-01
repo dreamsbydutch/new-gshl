@@ -368,7 +368,7 @@ export function PlayerStatsTable({
                                     aria-label="No game today"
                                     className="text-slate-400"
                                   >
-                                    —
+                                    -
                                   </span>
                                 ) : (
                                   getPlayerTodayGames(
@@ -434,7 +434,7 @@ export function PlayerStatsTable({
                             table.view === "today" &&
                             (!table.hasToday || isTodayNonAppearance) &&
                             !isPlayerIdentityColumn
-                              ? "—"
+                              ? "-"
                               : renderPlayerStatCell(player, column.key);
 
                           return column.key === "player" ? (
@@ -517,7 +517,7 @@ export function PlayerStatsTable({
                         table.view === "today" &&
                         (!table.hasToday || isTodayNonAppearance) &&
                         !isPlayerIdentityColumn
-                          ? "—"
+                          ? "-"
                           : renderPlayerStatCell(player, column.key);
                       const designation = matchupPlayerInjuryDesignation(
                         player,
