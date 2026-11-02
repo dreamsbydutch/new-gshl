@@ -15,7 +15,7 @@ const evidence = {
   startsAt: 1,
   facts: [{ id: "categories", text: "Home leads goals; Away leads hits." }],
 };
-const draft = (count = 6) => ({
+const draft = (count = 4) => ({
   headline: "Scoring meets the heavy game",
   turns: Array.from({ length: count }, (_, index) => ({
     speaker: index % 2 === 0 ? "home" : "away",
@@ -28,8 +28,8 @@ const draft = (count = 6) => ({
   prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
 });
 
-void test("one conversation contains exactly three responses per writer and one final prediction", () => {
-  for (const count of [6]) {
+void test("one conversation contains exactly two responses per writer and one final prediction", () => {
+  for (const count of [4]) {
     const parsed = parseMatchupPreviewConversation(
       JSON.stringify(draft(count)),
       evidence,
@@ -37,17 +37,16 @@ void test("one conversation contains exactly three responses per writer and one 
     assert.equal(parsed.paragraphs.length, count + 1);
     assert.equal(
       parsed.turns.filter((turn) => turn.speaker === "home").length,
-      3,
+      2,
     );
     assert.equal(
       parsed.turns.filter((turn) => turn.speaker === "away").length,
-      3,
+      2,
     );
     assert.match(parsed.paragraphs[0]!, /^Home:/);
     assert.match(parsed.paragraphs[1]!, /^Away:/);
     assert.match(parsed.paragraphs[2]!, /^Home:/);
     assert.match(parsed.paragraphs[3]!, /^Away:/);
-    assert.match(parsed.paragraphs[4]!, /^Home:/);
     assert.equal(
       parsed.paragraphs.at(-1),
       "Prediction: Home defeats Away, 6–4.",
@@ -56,7 +55,7 @@ void test("one conversation contains exactly three responses per writer and one 
 });
 
 void test("invalid turn counts, away openings, consecutive speakers and embedded paragraphs are rejected", () => {
-  for (const count of [3, 4, 5, 7, 8, 9, 10, 11])
+  for (const count of [2, 3, 5, 6, 7, 8])
     assert.throws(() =>
       parseMatchupPreviewConversation(JSON.stringify(draft(count)), evidence),
     );
@@ -123,7 +122,7 @@ void test("conversation enforces the combined word budget, known facts and categ
   const tooLong = draft();
   tooLong.turns = tooLong.turns.map((turn) => ({
     ...turn,
-    text: Array(65).fill("word").join(" "),
+    text: Array(100).fill("word").join(" "),
   }));
   assert.throws(
     () => parseMatchupPreviewConversation(JSON.stringify(tooLong), evidence),
@@ -132,13 +131,13 @@ void test("conversation enforces the combined word budget, known facts and categ
   const withinLimit = draft();
   withinLimit.turns = withinLimit.turns.map((turn) => ({
     ...turn,
-    text: Array(55).fill("word").join(" "),
+    text: Array(75).fill("word").join(" "),
   }));
   assert.doesNotThrow(() =>
     parseMatchupPreviewConversation(JSON.stringify(withinLimit), evidence),
   );
   const longTurn = draft();
-  longTurn.turns[0]!.text = Array(66).fill("word").join(" ");
+  longTurn.turns[0]!.text = Array(101).fill("word").join(" ");
   assert.throws(
     () => parseMatchupPreviewConversation(JSON.stringify(longTurn), evidence),
     /turn is too long/,
@@ -189,6 +188,11 @@ void test("request supplies both stable writer profiles and requires a single co
   assert.match(request.instructions, /home writer opens/);
   assert.match(request.instructions, /285–325 words/);
   assert.match(request.instructions, /400 words/);
+  assert.match(request.instructions, /exactly four conversational turns/);
+  assert.match(request.instructions, /65\u201380 words/);
+  assert.match(request.instructions, /selective statistics/);
+  assert.equal(request.text.format.schema.properties.turns.minItems, 4);
+  assert.equal(request.text.format.schema.properties.turns.maxItems, 4);
   assert.match(request.instructions, /Use ONLY supplied facts/);
   assert.equal(request.text.format.schema.properties.evidenceIds.maxItems, 12);
   assert.equal(request.text.format.schema.properties.evidenceIds.minItems, 1);

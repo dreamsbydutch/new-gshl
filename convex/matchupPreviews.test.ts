@@ -141,8 +141,6 @@ void test("conversation generation publishes both assigned writers, alternating 
             { speaker: "away", text: "But we can contest it." },
             { speaker: "home", text: "Fair, this should stay close." },
             { speaker: "away", text: "I can concede that much." },
-            { speaker: "home", text: "Only that much? You are generous." },
-            { speaker: "away", text: "Save the thanks for your goalie." },
           ],
           evidenceIds: ["roster"],
           prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
@@ -167,8 +165,6 @@ void test("conversation generation publishes both assigned writers, alternating 
     "Away: But we can contest it.",
     "Home: Fair, this should stay close.",
     "Away: I can concede that much.",
-    "Home: Only that much? You are generous.",
-    "Away: Save the thanks for your goalie.",
     "Prediction: Home defeats Away, 6–4.",
   ]);
   assert.equal(f.rows("matchupPreviews").length, 1);
