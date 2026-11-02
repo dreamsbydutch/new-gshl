@@ -145,8 +145,9 @@ void test("shows an active upcoming season with zero games and a 0-0 record", ()
     team("right", "upcoming", "B", "Beta"),
   ];
   assert.deepEqual(
-    getConferenceContestVisibleSeasons([upcoming], new Date("2098-09-22"))
-      .map(({ id }) => id),
+    getConferenceContestVisibleSeasons([upcoming], new Date("2098-09-22")).map(
+      ({ id }) => id,
+    ),
     ["upcoming"],
   );
   const models = buildConferenceContestSeasonViewModels({
@@ -158,6 +159,8 @@ void test("shows an active upcoming season with zero games and a 0-0 record", ()
   const view = projectConferenceContestBrowserView({
     overall: buildConferenceContestOverallFromSeasonModels(models),
     seasons: models,
+    gshlTeams: [],
+    teamAwards: [],
   });
   assert.equal(view.seasons[0]?.gamesPlayedByConferenceId.A, 0);
   assert.deepEqual(view.seasons[0]?.headToHeadRecordByConferenceId.A, {
@@ -189,6 +192,8 @@ void test("shows a draft-open preseason before season teams exist", () => {
   const view = projectConferenceContestBrowserView({
     overall: buildConferenceContestOverallFromSeasonModels(models),
     seasons: models,
+    gshlTeams: [],
+    teamAwards: [],
   });
   assert.equal(view.seasons[0]?.seasonId, "preseason");
   assert.equal(view.seasons[0]?.gamesPlayedByConferenceId.A, 0);
@@ -332,6 +337,8 @@ void test("projects historical arrays into the exact browser counts", () => {
   const browser = projectConferenceContestBrowserView({
     overall,
     seasons: [seasonModel],
+    gshlTeams: teams,
+    teamAwards: [award("coach", "s1", "right", AwardsList.JACK_ADAMS)],
   });
   const projectedSeason = browser.seasons[0];
   assert.ok(projectedSeason);
@@ -345,9 +352,81 @@ void test("projects historical arrays into the exact browser counts", () => {
     "full team arrays must not cross the browser boundary",
   );
   assert.equal(browser.overall?.coachAwardsByConferenceId.B, 1);
+  const cup = browser.overall?.trophies.find(
+    (row) => row.award === AwardsList.GSHL_CUP,
+  );
+  assert.equal(
+    cup?.winnersByConferenceId.A?.length,
+    1,
+    "recorded Cup and final are counted once",
+  );
+  assert.equal(cup?.winnersByConferenceId.A?.[0]?.teamName, "left");
+  const coach = browser.overall?.trophies.find(
+    (row) => row.award === AwardsList.JACK_ADAMS,
+  );
+  assert.equal(coach?.winnersByConferenceId.B?.[0]?.teamName, "right");
   assert.equal(
     browser.overall ? "currentRating" in browser.overall : true,
     false,
     "unused aggregate rating structures must stay server-side",
+  );
+});
+
+void test("trophy winners follow season membership and owner attribution, newest first", () => {
+  const teams = [
+    {
+      ...team("old", "s1", "A", "Alpha"),
+      ownerId: "owner",
+      name: "Old name",
+      logoUrl: "/old.png",
+    },
+    {
+      ...team("new", "s2", "B", "Beta"),
+      ownerId: "owner",
+      name: "New name",
+      logoUrl: "/new.png",
+    },
+    team("other1", "s1", "B", "Beta"),
+    team("other2", "s2", "A", "Alpha"),
+  ];
+  const awards = [
+    {
+      ...award("one", "s1", "old", AwardsList.HART),
+      ownerId: "owner",
+      teamId: "other1",
+    },
+    { ...award("two", "s2", "new", AwardsList.HART), ownerId: "owner" },
+    {
+      ...award("conference", "s1", "old", AwardsList.HICKORY),
+      ownerId: "owner",
+    },
+  ];
+  const models = buildConferenceContestSeasonViewModels({
+    seasons: [season("s1", 2024), season("s2", 2025)],
+    gshlTeams: teams,
+    teamAwards: awards,
+    matchups: [],
+  });
+  const view = projectConferenceContestBrowserView({
+    overall: buildConferenceContestOverallFromSeasonModels(models),
+    seasons: models,
+    gshlTeams: teams,
+    teamAwards: awards,
+  });
+  const hart = view.overall?.trophies.find(
+    (row) => row.award === AwardsList.HART,
+  );
+  assert.deepEqual(
+    hart?.winnersByConferenceId.A?.map((row) => [row.teamName, row.logoUrl]),
+    [["Old name", "/old.png"]],
+  );
+  assert.deepEqual(
+    hart?.winnersByConferenceId.B?.map((row) => row.teamName),
+    ["New name"],
+  );
+  assert.equal(
+    view.overall?.trophies.find((row) => row.award === AwardsList.HICKORY)
+      ?.winnersByConferenceId.A?.length,
+    1,
   );
 });

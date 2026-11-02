@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Info, Swords } from "lucide-react";
+import { ChevronDown, Info, Swords } from "lucide-react";
 import {
   CartesianGrid,
   Legend,
@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
 import { Button } from "@gshl-components/ui";
 import { ConferenceContestSkeleton } from "@gshl-skeletons";
 import {
@@ -24,6 +25,8 @@ import {
 } from "@gshl-hooks";
 import type {
   ConferenceContestConferenceInfo,
+  ConferenceContestTrophy,
+  ConferenceContestTrophyWinner,
   ConferenceContestBrowserSeason,
   ConferenceContestRawStatRow,
   ConferenceContestRecord,
@@ -238,7 +241,7 @@ function RatingTrend({
     >
       <div>
         <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
-          The rivalry over time
+          History
         </h2>
       </div>
       <label className="mt-3 flex items-center gap-3 text-sm text-slate-600">
@@ -253,13 +256,6 @@ function RatingTrend({
           <option value="cups">Cumulative GSHL Cups</option>
         </select>
       </label>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500">
-        {metric === "rating"
-          ? "Composite rating out of 100: head-to-head 35%, playoffs 30%, Cups 20%, awards 15%. A rating of 50 means balance; categories without evidence are neutral. Active seasons are provisional."
-          : metric === "wins"
-            ? "Non-conference regular-season wins in each season. Ties are shown in the season ledger below."
-            : "Running total of recorded championships, from the earliest season shown. No awarded Cup means no increase."}
-      </p>
       <div className="mt-5 h-72 w-full" aria-label={metric + " history chart"}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
@@ -319,106 +315,163 @@ function RatingTrend({
   );
 }
 
-function SeasonLedger({
-  seasons,
+function WinnerLogos({
+  winners,
+}: {
+  winners: ConferenceContestTrophyWinner[];
+}) {
+  const teams = [
+    ...new Map(winners.map((winner) => [winner.teamName, winner])).values(),
+  ];
+  return (
+    <span
+      className="flex h-7 items-center justify-center -space-x-2"
+      aria-hidden="true"
+    >
+      {teams.slice(0, 3).map((winner) => (
+        <span
+          key={winner.teamName}
+          className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[8px] font-semibold text-slate-600"
+        >
+          {winner.logoUrl ? (
+            <Image
+              src={winner.logoUrl}
+              alt=""
+              width={24}
+              height={24}
+              className="h-5 w-5 rounded-full object-contain"
+            />
+          ) : (
+            winner.teamAbbr.slice(0, 3)
+          )}
+        </span>
+      ))}
+      {teams.length > 3 && (
+        <span className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[9px] text-slate-600">
+          +{teams.length - 3}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function TrophyCase({
+  trophies,
   left,
   right,
 }: {
-  seasons: ConferenceContestBrowserSeason[];
+  trophies: ConferenceContestTrophy[];
   left: ConferenceContestConferenceInfo;
   right: ConferenceContestConferenceInfo;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-      <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
-        Season by season
-      </h2>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500">
-        Regular-season head-to-head wins, ties, and recorded Cups. Bar widths
-        show each share of games; gray marks ties. Results follow each team&apos;s
-        conference in that season. Active seasons are still in progress.
-      </p>
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[480px] text-left text-xs">
-          <caption className="sr-only">
-            Conference history: wins and Cups are listed as{" "}
-            {cleanConferenceName(left.name)} / {cleanConferenceName(right.name)}
-          </caption>
-          <thead className="border-b text-slate-500">
-            <tr>
-              <th scope="col" className="py-3">
-                Season
-              </th>
-              <th scope="col">
-                Head-to-head wins
-                <br />
-                {left.abbr ?? left.name} / {right.abbr ?? right.name}
-              </th>
-              <th scope="col">Ties</th>
-              <th scope="col">
-                Cups
-                <br />
-                {left.abbr ?? left.name} / {right.abbr ?? right.name}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {[...seasons]
-              .sort((a, b) => b.seasonYear - a.seasonYear)
-              .map((season) => {
-                const l = season.headToHeadWinsByConferenceId[left.id] ?? 0,
-                  r = season.headToHeadWinsByConferenceId[right.id] ?? 0;
-                const ties =
-                    season.headToHeadRecordByConferenceId[left.id]?.ties ?? 0,
-                  total = l + r + ties;
-                return (
-                  <tr key={season.seasonId}>
-                    <th scope="row" className="py-4 pr-3 font-medium">
-                      {season.seasonName}
-                      {season.isActive && (
-                        <span className="block text-[10px] text-slate-500">
-                          In progress
-                        </span>
-                      )}
-                    </th>
-                    <td className="w-2/5 py-4 pr-5">
-                      <span className="tabular-nums">
-                        {total ? l + " / " + r : "No games"}
-                      </span>
-                      <div
-                        aria-hidden="true"
-                        className="mt-1 flex h-2 overflow-hidden rounded-full bg-slate-100"
-                      >
-                        <span
-                          style={{
-                            width: total ? (l / total) * 100 + "%" : 0,
-                            backgroundColor: conferenceTone(left).line,
-                          }}
-                        />
-                        <span
-                          className="bg-slate-400"
-                          style={{
-                            width: total ? (ties / total) * 100 + "%" : 0,
-                          }}
-                        />
-                        <span
-                          style={{
-                            width: total ? (r / total) * 100 + "%" : 0,
-                            backgroundColor: conferenceTone(right).line,
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td className="tabular-nums">{ties}</td>
-                    <td className="tabular-nums">
-                      {season.championsByConferenceId[left.id] ?? 0} /{" "}
-                      {season.championsByConferenceId[right.id] ?? 0}
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
+    <section
+      aria-label="Conference trophy case"
+      className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+    >
+      <div className="grid grid-cols-[1fr_7rem_1fr] items-center border-b border-slate-200 px-3 py-3 sm:grid-cols-[1fr_10rem_1fr]">
+        <div className="mx-auto">
+          <ConferenceLogo conference={left} size={32} />
+        </div>
+        <h2 className="text-center font-oswald text-lg">Trophy case</h2>
+        <div className="mx-auto">
+          <ConferenceLogo conference={right} size={32} />
+        </div>
+      </div>
+      {!trophies.length && (
+        <p className="p-4 text-center text-xs text-slate-400">
+          Trophy history unavailable
+        </p>
+      )}
+      <div className="divide-y divide-slate-100">
+        {trophies.map((trophy) => {
+          const award = AWARD_CATALOG_BY_KEY.get(trophy.award);
+          const leftWinners = trophy.winnersByConferenceId[left.id] ?? [];
+          const rightWinners = trophy.winnersByConferenceId[right.id] ?? [];
+          return (
+            <details key={trophy.award} className="group">
+              <summary className="grid min-h-20 cursor-pointer list-none grid-cols-[1fr_7rem_1fr] items-center gap-2 px-3 py-2 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-500 sm:grid-cols-[1fr_10rem_1fr] [&::-webkit-details-marker]:hidden">
+                <span className="text-center">
+                  <span
+                    className={cn(
+                      "block font-oswald text-2xl tabular-nums",
+                      conferenceTone(left).text,
+                    )}
+                  >
+                    <span className="sr-only">{left.name}: </span>
+                    {leftWinners.length}
+                  </span>
+                  <WinnerLogos winners={leftWinners} />
+                </span>
+                <span className="flex flex-col items-center gap-1 text-center">
+                  <Image
+                    src={award?.imageUrl ?? "/awards/gshl-cup-transparent.png"}
+                    alt=""
+                    width={40}
+                    height={48}
+                    className="h-9 w-8 object-contain"
+                  />
+                  <span className="text-[10px] leading-tight text-slate-600">
+                    {award?.fullName ?? trophy.award}
+                  </span>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="h-3 w-3 text-slate-400 group-open:rotate-180"
+                  />
+                </span>
+                <span className="text-center">
+                  <span
+                    className={cn(
+                      "block font-oswald text-2xl tabular-nums",
+                      conferenceTone(right).text,
+                    )}
+                  >
+                    <span className="sr-only">{right.name}: </span>
+                    {rightWinners.length}
+                  </span>
+                  <WinnerLogos winners={rightWinners} />
+                </span>
+              </summary>
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-100 bg-slate-50 px-3 py-3 sm:px-5">
+                {[left, right].map((conference) => (
+                  <ul
+                    key={conference.id}
+                    aria-label={conference.name + " winners"}
+                    className="space-y-2"
+                  >
+                    {(trophy.winnersByConferenceId[conference.id] ?? []).map(
+                      (winner, index) => (
+                        <li
+                          key={index}
+                          className="flex items-center gap-2 text-[11px]"
+                        >
+                          {winner.logoUrl && (
+                            <Image
+                              src={winner.logoUrl}
+                              alt=""
+                              width={24}
+                              height={24}
+                              className="h-6 w-6 shrink-0 object-contain"
+                            />
+                          )}
+                          <span className="min-w-0">
+                            <span className="block text-[10px] text-slate-400">
+                              {winner.seasonName}
+                            </span>
+                            {winner.teamName}
+                          </span>
+                        </li>
+                      ),
+                    )}
+                    {!trophy.winnersByConferenceId[conference.id]?.length && (
+                      <li className="text-center text-xs text-slate-400">?</li>
+                    )}
+                  </ul>
+                ))}
+              </div>
+            </details>
+          );
+        })}
       </div>
     </section>
   );
@@ -598,7 +651,7 @@ export function ConferenceContest() {
 
       <RatingTrend seasons={seasons} left={left} right={right} />
 
-      <SeasonLedger seasons={seasons} left={left} right={right} />
+      <TrophyCase trophies={overall.trophies ?? []} left={left} right={right} />
       {selectedSeason ? (
         <SeasonExplorer selectedSeason={selectedSeason} />
       ) : (

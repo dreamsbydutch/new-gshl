@@ -105,11 +105,24 @@ export interface ConferenceContestBrowserSeason
   headToHeadRecordByConferenceId: Record<string, ConferenceContestRecord>;
 }
 
+export interface ConferenceContestTrophyWinner {
+  seasonName: string;
+  teamName: string;
+  teamAbbr: string;
+  logoUrl: string | null;
+}
+
+export interface ConferenceContestTrophy {
+  award: TeamAward["award"];
+  winnersByConferenceId: Record<string, ConferenceContestTrophyWinner[]>;
+}
+
 /** Exact all-time payload rendered above the season explorer. */
 export interface ConferenceContestBrowserOverall
   extends ConferenceContestBrowserCounts {
   leftConference: ConferenceContestConferenceInfo;
   rightConference: ConferenceContestConferenceInfo;
+  trophies: ConferenceContestTrophy[];
   coachAwardsByConferenceId: Record<string, number>;
   gmAwardsByConferenceId: Record<string, number>;
 }

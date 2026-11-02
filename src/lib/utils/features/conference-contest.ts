@@ -23,7 +23,7 @@ import {
   findMostRecentSeason,
   isSeasonPickable,
 } from "../domain/season";
-import { getTeamAwardTeam } from "@gshl-lib/config/awards";
+import { AWARD_CATALOG, getTeamAwardTeam } from "@gshl-lib/config/awards";
 import { isPlayoffMatchupType } from "@gshl-utils/domain/matchup";
 
 export type {
@@ -82,7 +82,9 @@ export const getConferenceContestVisibleSeasons = (
   const defaultSeason =
     currentSeason ??
     [...seasons]
-      .filter((season) => season.isActive && isSeasonPickable(season, referenceDate))
+      .filter(
+        (season) => season.isActive && isSeasonPickable(season, referenceDate),
+      )
       .sort((left, right) => right.year - left.year)[0] ??
     findMostRecentSeason(seasons, referenceDate);
   const defaultSeasonId = normalizeId(defaultSeason?.id);
@@ -368,7 +370,9 @@ export const buildConferenceContestSeasonViewModel = (params: {
           ...seasonConferences,
           ...fallbackConferences.filter(
             (conference) =>
-              !seasonConferences.some((existing) => existing.id === conference.id),
+              !seasonConferences.some(
+                (existing) => existing.id === conference.id,
+              ),
           ),
         ].sort((left, right) => left.name.localeCompare(right.name));
   const leftConference = conferences[0];
@@ -752,6 +756,8 @@ const projectConferenceCounts = (
 export function projectConferenceContestBrowserView(params: {
   overall: ConferenceContestOverallViewModel | null;
   seasons: ConferenceContestSeasonViewModel[];
+  gshlTeams: readonly GSHLTeam[];
+  teamAwards: readonly TeamAward[];
 }): ConferenceContestBrowserView {
   const seasons: ConferenceContestBrowserSeason[] = params.seasons.map(
     (season) => {
@@ -773,9 +779,7 @@ export function projectConferenceContestBrowserView(params: {
             const record = season.headToHeadRecordByConferenceId[id];
             return [
               id,
-              (record?.wins ?? 0) +
-                (record?.losses ?? 0) +
-                (record?.ties ?? 0),
+              (record?.wins ?? 0) + (record?.losses ?? 0) + (record?.ties ?? 0),
             ];
           }),
         ),
@@ -793,6 +797,42 @@ export function projectConferenceContestBrowserView(params: {
       leftConference: source.leftConference,
       rightConference: source.rightConference,
       ...projectConferenceCounts(source, conferenceIds),
+      trophies: AWARD_CATALOG.map(({ key }) => ({
+        award: key,
+        winnersByConferenceId: Object.fromEntries(
+          conferenceIds.map((id) => {
+            const winners = [...params.seasons]
+              .sort((a, b) => b.seasonYear - a.seasonYear)
+              .flatMap((season) => {
+                const teams =
+                  key === AwardsList.GSHL_CUP
+                    ? (season.championTeamsByConferenceId[id] ?? [])
+                    : params.teamAwards
+                        .filter(
+                          (award) =>
+                            String(award.seasonId) === season.seasonId &&
+                            award.award === key,
+                        )
+                        .map((award) =>
+                          getTeamAwardTeam(award, params.gshlTeams),
+                        )
+                        .filter(
+                          (team): team is GSHLTeam =>
+                            !!team &&
+                            String(team.seasonId) === season.seasonId &&
+                            String(team.confId) === id,
+                        );
+                return teams.map((team) => ({
+                  seasonName: season.seasonName,
+                  teamName: team.name ?? team.abbr ?? "Unknown team",
+                  teamAbbr: team.abbr ?? team.name?.slice(0, 3) ?? "?",
+                  logoUrl: team.logoUrl ?? null,
+                }));
+              });
+            return [id, winners];
+          }),
+        ),
+      })),
       coachAwardsByConferenceId: Object.fromEntries(
         conferenceIds.map((id) => [
           id,
