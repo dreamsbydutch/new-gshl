@@ -183,17 +183,21 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                     >
                       Rating
                     </th>
-                    {["Recent performance", "Matchup Elo", "Roster talent"].map(
-                      (label) => (
-                        <th
-                          key={label}
-                          scope="col"
-                          className="border-b border-slate-200 px-2.5 py-2 text-right"
-                        >
+                    {[
+                      ["Form", "Recent performance (0–100 display scale)"],
+                      ["Elo", "Matchup Elo"],
+                      ["Talent", "Roster talent (0–100 display scale)"],
+                    ].map(([label, description]) => (
+                      <th
+                        key={label}
+                        scope="col"
+                        className="whitespace-nowrap border-b border-slate-200 px-2.5 py-2 text-right text-[10px] tracking-normal"
+                      >
+                        <abbr title={description} className="no-underline">
                           {label}
-                        </th>
-                      ),
-                    )}
+                        </abbr>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
