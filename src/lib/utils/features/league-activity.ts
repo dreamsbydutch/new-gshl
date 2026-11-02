@@ -155,16 +155,6 @@ export function buildLeagueActivity({
       teamLogoUrl: null,
       trade,
     });
-  const tradedAdds = new Set(
-    trades.flatMap((t) =>
-      t.players.map((p) => `${t.date}:${p.toTeamId}:${p.playerId}`),
-    ),
-  );
-  const tradedDrops = new Set(
-    trades.flatMap((t) =>
-      t.players.map((p) => `${t.date}:${p.fromTeamId}:${p.playerId}`),
-    ),
-  );
   contracts.forEach((contract) => {
     const date = normalizeDateOnlyValue(contract.signingDate);
     const isTrade = contract.signingStatus === ContractStatus.TRADE;
@@ -222,10 +212,7 @@ export function buildLeagueActivity({
     rosterByDate.set(date, teamsForDate);
 
     const team = teamById.get(teamId);
-    if (
-      toNumber(row.ADD, 0) > 0 &&
-      !tradedAdds.has(`${date}:${teamId}:${playerId}`)
-    ) {
+    if (toNumber(row.ADD, 0) > 0) {
       push({
         id: `add:${row.id}`,
         type: "add",
@@ -257,7 +244,6 @@ export function buildLeagueActivity({
 
       yesterdayRoster.forEach((playerId) => {
         if (todayRoster.has(playerId)) return;
-        if (tradedDrops.has(`${date}:${teamId}:${playerId}`)) return;
         push({
           id: `drop:${date}:${teamId}:${playerId}`,
           type: "drop",
@@ -270,6 +256,52 @@ export function buildLeagueActivity({
     });
   });
 
+  const tradedAdds = new Set<string>();
+  const tradedDrops = new Set<string>();
+  const dates = [...rosterByDate.keys()].sort();
+  const firstDate = dates[0];
+  for (const trade of trades)
+    for (const player of trade.players) {
+      const baseline = firstDate ? rosterByDate.get(firstDate) : undefined;
+      // An older transfer that is no longer represented in this read window
+      // must not consume a later genuine free-agent pickup.
+      if (
+        firstDate &&
+        trade.date < firstDate &&
+        (!baseline?.get(player.fromTeamId)?.has(player.playerId) ||
+          baseline.get(player.toTeamId)?.has(player.playerId))
+      )
+        continue;
+      const arrival = dates.find(
+        (date) =>
+          date >= trade.date &&
+          rosterByDate.get(date)?.get(player.toTeamId)?.has(player.playerId),
+      );
+      if (arrival)
+        tradedAdds.add(`${arrival}:${player.toTeamId}:${player.playerId}`);
+      const departure = dates.find((date) => {
+        if (date < trade.date || (arrival && date > arrival)) return false;
+        const current = rosterByDate.get(date)?.get(player.fromTeamId);
+        const previous = rosterByDate
+          .get(previousCalendarDate(date))
+          ?.get(player.fromTeamId);
+        return (
+          current &&
+          !current.has(player.playerId) &&
+          previous?.has(player.playerId)
+        );
+      });
+      if (departure)
+        tradedDrops.add(`${departure}:${player.fromTeamId}:${player.playerId}`);
+    }
+  const visibleEvents = events.filter((event) => {
+    const key = `${event.date}:${event.teamId}:${event.playerId}`;
+    return (
+      !(event.type === "add" && tradedAdds.has(key)) &&
+      !(event.type === "drop" && tradedDrops.has(key))
+    );
+  });
+
   const weekFor = (date: string) =>
     weeks.find((week) => {
       const start = normalizeDateOnlyValue(week.startDate);
@@ -277,14 +309,14 @@ export function buildLeagueActivity({
       return start && end && date >= start && date <= end;
     });
   const weeklyAdds = new Map<string, number>();
-  for (const event of events) {
+  for (const event of visibleEvents) {
     if (event.type !== "add") continue;
     const week = weekFor(event.date);
     if (!week) continue;
     const key = `${event.teamId}:${week.id}`;
     weeklyAdds.set(key, (weeklyAdds.get(key) ?? 0) + 1);
   }
-  for (const event of events) {
+  for (const event of visibleEvents) {
     if (event.type !== "add") continue;
     const week = weekFor(event.date);
     event.weeklyAddCount = week
@@ -292,7 +324,7 @@ export function buildLeagueActivity({
       : null;
   }
   return limitLeagueActivity(
-    events.sort((left, right) => {
+    visibleEvents.sort((left, right) => {
       const dateDelta = right.date.localeCompare(left.date);
       if (dateDelta !== 0) return dateDelta;
       const typeDelta = TYPE_PRIORITY[left.type] - TYPE_PRIORITY[right.type];

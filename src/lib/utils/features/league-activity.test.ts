@@ -33,6 +33,168 @@ const teams = [
   { id: "t2", seasonId: "s1", franchiseId: "f2" },
 ];
 
+void test("an old trade already visible on the receiver cannot hide a later drop from the sender", () => {
+  const trade: LeagueTradeSummary = {
+    id: "old",
+    date: "2026-01-02",
+    teamA: { id: "t1", name: "Team A", logoUrl: null },
+    teamB: { id: "t2", name: "Team B", logoUrl: null },
+    players: [
+      {
+        playerId: "p1",
+        playerName: "Player One",
+        fromTeamId: "t1",
+        toTeamId: "t2",
+      },
+    ],
+    picks: [],
+    notes: "",
+  };
+  const playerDays = [10, 11, 12, 13].flatMap((day) => {
+    const date = `2026-01-${day}`;
+    const rows = [
+      {
+        id: `a-${day}`,
+        date,
+        gshlTeamId: "t1",
+        playerId: "p2",
+        ADD: "",
+        MS: "",
+      },
+      {
+        id: `b-${day}`,
+        date,
+        gshlTeamId: "t2",
+        playerId: "p3",
+        ADD: "",
+        MS: "",
+      },
+    ];
+    if (day !== 12)
+      rows.push({
+        id: `return-${day}`,
+        date,
+        gshlTeamId: day === 11 ? "t1" : "t2",
+        playerId: "p1",
+        ADD: day === 11 || day === 13 ? "1" : "",
+        MS: "",
+      });
+    return rows;
+  });
+  const result = buildLeagueActivity({
+    players,
+    teams,
+    franchises,
+    contracts: [],
+    trades: [trade],
+    playerDays,
+    perTypeLimit: true,
+  });
+  assert(
+    result.some(
+      (event) =>
+        event.type === "drop" &&
+        event.playerId === "p1" &&
+        event.teamId === "t1" &&
+        event.date === "2026-01-12",
+    ),
+  );
+  assert.equal(
+    result.filter((event) => event.type === "add" && event.playerId === "p1")
+      .length,
+    2,
+  );
+});
+
+void test("next-day Yahoo capture is matched to the trade while a later genuine drop and re-add remain activity", () => {
+  const trade: LeagueTradeSummary = {
+    id: "delayed",
+    date: "2026-01-02",
+    teamA: { id: "t1", name: "Team A", logoUrl: null },
+    teamB: { id: "t2", name: "Team B", logoUrl: null },
+    players: [
+      {
+        playerId: "p1",
+        playerName: "Player One",
+        fromTeamId: "t1",
+        toTeamId: "t2",
+      },
+    ],
+    picks: [],
+    notes: "",
+  };
+  const playerDays = [1, 2, 3, 4, 5].flatMap((day) => {
+    const date = `2026-01-0${day}`;
+    const rows = [
+      {
+        id: `a-${day}`,
+        date,
+        gshlTeamId: "t1",
+        playerId: "p2",
+        ADD: "",
+        MS: "",
+      },
+      {
+        id: `b-${day}`,
+        date,
+        gshlTeamId: "t2",
+        playerId: "p3",
+        ADD: "",
+        MS: "",
+      },
+    ];
+    if (day !== 4)
+      rows.push({
+        id: `transfer-${day}`,
+        date,
+        gshlTeamId: day < 3 ? "t1" : "t2",
+        playerId: "p1",
+        ADD: day === 3 || day === 5 ? "1" : "",
+        MS: "",
+      });
+    return rows;
+  });
+  const result = buildLeagueActivity({
+    players,
+    teams,
+    franchises,
+    contracts: [],
+    trades: [trade],
+    playerDays,
+    weeks: [{ id: "week", startDate: "2026-01-01", endDate: "2026-01-07" }],
+    perTypeLimit: true,
+  });
+  assert.deepEqual(
+    result
+      .filter((event) => event.type === "add")
+      .map((event) => [event.playerId, event.date, event.weeklyAddCount]),
+    [["p1", "2026-01-05", 1]],
+  );
+  assert.deepEqual(
+    result
+      .filter((event) => event.type === "drop")
+      .map((event) => [event.playerId, event.date, event.teamId]),
+    [["p1", "2026-01-04", "t2"]],
+  );
+  assert.equal(result.filter((event) => event.type === "trade").length, 1);
+  const later =
+    result.length &&
+    buildLeagueActivity({
+      players,
+      teams,
+      franchises,
+      contracts: [],
+      trades: [trade],
+      playerDays: playerDays.filter((row) => row.date >= "2026-01-04"),
+      perTypeLimit: true,
+    });
+  assert.equal(
+    later && later.find((event) => event.type === "add")?.date,
+    "2026-01-05",
+    "old trades must not swallow later pickups when their original transition is outside the read window",
+  );
+});
+
 void test("recorded trade packages show players and picks without spending weekly adds or creating drop notices", () => {
   const trade: LeagueTradeSummary = {
     id: "deal",

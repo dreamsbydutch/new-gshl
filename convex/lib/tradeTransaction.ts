@@ -358,16 +358,48 @@ export async function prepareTrade(ctx: Ctx, request: TradeRequest) {
     pick.originalTeamId ??= pickTeam._id;
     pick.isTraded = true;
   }
-  const movingIds = new Set(ids);
-  for (const pick of pickById.values()) {
-    const season = seasonById.get(pick.seasonId);
-    if (
-      season &&
-      pendingDraft(season) &&
-      pick.isSigning &&
-      pick.playerId &&
-      movingIds.has(pick.playerId)
-    ) {
+  const reservations: Array<{
+    playerId: Id<"players">;
+    playerName: string;
+    seasonName: string;
+    teamName: string;
+    pickLabel: string;
+    pickId: Id<"draftPicks">;
+  }> = [];
+  for (const season of futureSeasons) {
+    const start = day(season.startDate);
+    if (!start) throw Error("Future season dates are required");
+    if (start <= request.effectiveDate) continue;
+    const covers = (contract: Doc<"contracts">) =>
+      Boolean(
+        day(contract.startDate) &&
+          day(contract.startDate)! <= start &&
+          day(contract.expiryDate) &&
+          day(contract.expiryDate)! >= start,
+      );
+    const affected =
+      transferredPlayers.some((move) => move.contracts.some(covers)) ||
+      pickTransfers.some(
+        (transfer) => pickById.get(transfer.pickId)?.seasonId === season._id,
+      );
+    if (!affected) continue;
+    if (!pendingDraft(season))
+      throw Error(
+        `The ${season.name} draft has already started; keeper reservations are locked`,
+      );
+    const keepers = [...allContracts.values()].filter(
+      (contract) =>
+        transferableKind(contract) &&
+        signedDay(contract) !== null &&
+        signedDay(contract)! <= getTorontoDate() &&
+        covers(contract),
+    );
+    const keeperIds = new Set(keepers.map((contract) => contract.playerId));
+    // Repack both complete keeper classes, including players who were not traded.
+    for (const pick of pickById.values()) {
+      if (pick.seasonId !== season._id || !pick.isSigning) continue;
+      if (!pick.playerId || !keeperIds.has(pick.playerId))
+        throw Error("An existing keeper pick has no matching contract");
       if (
         pick.onClockStartedAt != null ||
         pick.onClockExpiresAt != null ||
@@ -377,37 +409,16 @@ export async function prepareTrade(ctx: Ctx, request: TradeRequest) {
       pick.playerId = null;
       pick.isSigning = false;
     }
-  }
-  const reservations: Array<{
-    playerId: Id<"players">;
-    playerName: string;
-    seasonName: string;
-    teamName: string;
-    pickLabel: string;
-    pickId: Id<"draftPicks">;
-  }> = [];
-  for (const move of [...transferredPlayers].sort((a, b) =>
-    a.player._id.localeCompare(b.player._id),
-  )) {
-    for (const season of futureSeasons) {
-      const start = day(season.startDate);
-      if (!start) throw Error("Future season dates are required");
-      if (start <= request.effectiveDate) continue;
-      const covering = move.contracts.filter(
-        (c) =>
-          day(c.startDate) &&
-          day(c.startDate)! <= start &&
-          day(c.expiryDate) &&
-          day(c.expiryDate)! >= start,
+    for (const ownerId of [franchiseA.ownerId, franchiseB.ownerId]) {
+      const owned = keepers.filter(
+        (contract) =>
+          (contractOwners.get(contract._id) ?? contract.ownerId) === ownerId,
       );
-      if (covering.length > 1)
-        throw Error(`${move.player.fullName} has overlapping contracts`);
-      if (!covering.length) continue;
-      if (!pendingDraft(season))
-        throw Error(
-          `The ${season.name} draft has already started; keeper reservations are locked`,
-        );
-      const destination = receivingTeam(season._id, teamOwner(move.to));
+      if (!owned.length) continue;
+      const remaining = new Set(owned.map((contract) => contract.playerId));
+      if (remaining.size !== owned.length)
+        throw Error("A keeper has overlapping contracts");
+      const destination = receivingTeam(season._id, ownerId);
       const available = [...pickById.values()]
         .filter(
           (p) =>
@@ -424,21 +435,36 @@ export async function prepareTrade(ctx: Ctx, request: TradeRequest) {
             Number(b.round) - Number(a.round) ||
             Number(b.pick) - Number(a.pick) ||
             b._id.localeCompare(a._id),
-        )[0];
-      if (!available)
+        )
+        .slice(0, owned.length);
+      if (available.length !== owned.length)
         throw Error(
-          `No keeper pick is available for ${move.player.fullName} in ${season.name}`,
+          `No keeper pick is available for ${ownerId === franchiseA.ownerId ? franchiseA.name : franchiseB.name} in ${season.name}`,
         );
-      available.playerId = move.player._id;
-      available.isSigning = true;
-      reservations.push({
-        playerId: move.player._id,
-        playerName: move.player.fullName,
-        seasonName: season.name,
-        teamName: move.to._id === teamA._id ? franchiseA.name : franchiseB.name,
-        pickId: available._id,
-        pickLabel: `Round ${available.round}, pick ${available.pick ?? "—"}`,
-      });
+      // Retain existing assignments whenever their picks remain in the final class.
+      for (const pick of available) {
+        const previous = originalPicks.get(pick._id)?.playerId;
+        if (previous && remaining.delete(previous)) pick.playerId = previous;
+      }
+      for (const pick of available) {
+        const playerId = pick.playerId ?? [...remaining].sort()[0];
+        if (!playerId)
+          throw Error("The final keeper class could not be resolved");
+        remaining.delete(playerId);
+        const player = await ctx.db.get(playerId);
+        if (!player) throw Error("A keeper player is missing");
+        pick.playerId = playerId;
+        pick.isSigning = true;
+        reservations.push({
+          playerId,
+          playerName: player.fullName,
+          seasonName: season.name,
+          teamName:
+            ownerId === franchiseA.ownerId ? franchiseA.name : franchiseB.name,
+          pickId: pick._id,
+          pickLabel: `Round ${pick.round}, pick ${pick.pick ?? "—"}`,
+        });
+      }
     }
   }
   const caps: Array<{

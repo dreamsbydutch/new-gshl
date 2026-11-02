@@ -257,6 +257,34 @@ void test("picks-only trades leave contracts and rosters untouched", async () =>
   );
 });
 
+void test("an unbalanced contract trade compacts the sender's remaining keepers onto its latest picks", async () => {
+  const { f, request } = fixture();
+  f.put("players", "retained", {
+    ...f.get("playerA")!,
+    _id: "retained",
+    fullName: "Retained Keeper",
+  });
+  f.put("contracts", "retained-contract", {
+    ...f.get("contractA")!,
+    _id: "retained-contract",
+    playerId: "retained",
+    contractSalary: 2000000,
+    capHit: 2000000,
+  });
+  f.put("draftPicks", "A4", {
+    ...f.get("A5")!,
+    _id: "A4",
+    round: 4,
+    playerId: "retained",
+  });
+  request.playerIdsB = [];
+  await execute(f, request);
+  assert.equal(f.get("A5")?.playerId, "retained");
+  assert.equal(f.get("A4")?.playerId, null);
+  assert.equal(f.get("A4")?.isSigning, false);
+  assert.equal(f.get("retained-contract")?.ownerId, "ownerA");
+});
+
 void test("buyout cap charges stay with their original owner when that player is traded", async () => {
   const { f, request } = fixture();
   f.put("contracts", "buyout", {
