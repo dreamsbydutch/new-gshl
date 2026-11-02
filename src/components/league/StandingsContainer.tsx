@@ -140,7 +140,7 @@ function StandingsGroupTable({
       </div>
 
       <div className="overflow-x-auto bg-white">
-        <table className="w-full table-fixed border-collapse text-xs sm:w-max sm:table-auto sm:text-sm">
+        <table className="w-full table-auto border-collapse text-xs sm:w-max sm:table-auto sm:text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-[10px] uppercase tracking-[0.16em] text-slate-500">
               <th className="w-10 px-1.5 py-2.5 text-center font-semibold sm:w-12 sm:px-3 sm:py-3">
