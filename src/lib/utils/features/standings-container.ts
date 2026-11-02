@@ -16,10 +16,12 @@ import type {
   StandingsTeamGameContext,
   StandingsTeamRow,
   StandingsTopPlayer,
+  Season,
   TeamSeasonStatLine,
   Week,
 } from "@gshl-types";
 import { keyBy } from "../core";
+import { calculateStandingsPoints } from "../domain/season";
 
 // Re-export types for backward compatibility
 export type {
@@ -118,14 +120,22 @@ type StandingsTeamWithStats = GSHLTeam & { seasonStats?: TeamSeasonStatLine };
 
 /** Matchup appearances, rather than individual NHL player games. */
 export function standingsMatchupSummary(
-  stats?: Pick<TeamSeasonStatLine, "teamW" | "teamL" | "teamT">,
+  stats?: Partial<
+    Pick<TeamSeasonStatLine, "teamW" | "teamL" | "teamT" | "teamHW" | "teamHL">
+  >,
+  season?: Pick<Season, "usesLegacyTies"> | null,
 ) {
-  if (!stats) return { played: "-", winPercentage: "-" };
+  if (!stats) {
+    return { played: "-", winPercentage: "-", pointsPercentage: "-" };
+  }
   const wins = Number(stats.teamW ?? 0);
   const played = wins + Number(stats.teamL ?? 0) + Number(stats.teamT ?? 0);
+  const points = calculateStandingsPoints(stats, season);
   return {
     played,
     winPercentage: played > 0 ? `${((wins / played) * 100).toFixed(1)}%` : "-",
+    pointsPercentage:
+      played > 0 ? `${((points / (played * 3)) * 100).toFixed(1)}%` : "-",
   };
 }
 type GroupTeamsOptions = {
