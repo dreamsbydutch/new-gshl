@@ -174,7 +174,10 @@ function StandingsGroupTable({
                 PTS
               </th>
               {[
-                ["Win %", "Matchup wins divided by matchups played"],
+                [
+                  "Pts %",
+                  "Standings points divided by the maximum available points",
+                ],
                 ["Streak", "Current matchup streak"],
                 ["Power", "Season power rank"],
               ].map(([label, description]) => (
@@ -197,7 +200,7 @@ function StandingsGroupTable({
           <tbody className="divide-y divide-slate-100">
             {group.teams.map((team, index) => {
               const isOpen = openTeamId === team.id;
-              const summary = standingsMatchupSummary(team.seasonStats);
+              const summary = standingsMatchupSummary(team.seasonStats, season);
               const detailsId = `standings-team-${group.title
                 .toLowerCase()
                 .replaceAll(" ", "-")}-${team.id}`;
@@ -302,7 +305,7 @@ function StandingsGroupTable({
                       {getStandingValue("points", team, season)}
                     </td>
                     {[
-                      summary.winPercentage,
+                      summary.pointsPercentage,
                       team.seasonStats?.streak ?? "-",
                       team.seasonStats && team.seasonStats.powerRk > 0
                         ? `#${team.seasonStats.powerRk}`

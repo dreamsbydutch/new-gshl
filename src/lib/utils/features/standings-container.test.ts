@@ -12,15 +12,20 @@ void test("standings matchup summary counts ties and handles unplayed seasons", 
   assert.deepEqual(standingsMatchupSummary(), {
     played: "-",
     winPercentage: "-",
+    pointsPercentage: "-",
   });
   assert.deepEqual(standingsMatchupSummary({ teamW: 0, teamL: 0, teamT: 0 }), {
     played: 0,
     winPercentage: "-",
+    pointsPercentage: "-",
   });
-  assert.deepEqual(standingsMatchupSummary({ teamW: 3, teamL: 1, teamT: 2 }), {
-    played: 6,
-    winPercentage: "50.0%",
-  });
+  assert.deepEqual(
+    standingsMatchupSummary(
+      { teamW: 3, teamL: 1, teamT: 2, teamHW: 1, teamHL: 1 },
+      { usesLegacyTies: false },
+    ),
+    { played: 6, winPercentage: "50.0%", pointsPercentage: "50.0%" },
+  );
 });
 
 const timestamp = new Date("2026-01-01T00:00:00.000Z");
