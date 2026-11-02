@@ -3,6 +3,28 @@ import test from "node:test";
 import { getLineupBuilder } from "../lineup/lineup-builder";
 import { refreshPlayerDayLineupContext } from "./player-day-lineup-context";
 
+void test("rejects hindsight bad starts without enough played bench alternatives", () => {
+  const source = [
+    {
+      seasonId: "s",
+      gshlTeamId: "t",
+      date: "2026-10-20",
+      playerId: "p",
+      GP: "1",
+      GS: "1",
+      dailyPos: "G",
+      posGroup: "G",
+    },
+  ];
+  assert.throws(
+    () =>
+      refreshPlayerDayLineupContext(source, (rows) =>
+        rows.map((row) => ({ ...row, fullPos: "G", bestPos: "BN" })),
+      ),
+    /Bad starts exceed played bench alternatives/,
+  );
+});
+
 void test("daily bad starts require a played alternative, including zero-rated skaters and negative-rated goalies", async () => {
   const builder = await getLineupBuilder();
   for (const [position, posGroup, rating] of [
