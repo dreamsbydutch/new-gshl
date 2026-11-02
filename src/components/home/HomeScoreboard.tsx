@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useHomeScoreboard } from "@gshl-hooks/features/useHomeScoreboard";
+import { usePowerRankingsPreview } from "@gshl-hooks/main/usePowerRankings";
 import { buildMatchupNavigationHref } from "@gshl-utils";
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
@@ -27,6 +28,7 @@ export function HomeScoreboardSkeleton() {
 export function HomeScoreboard({ seasonId }: { seasonId: string }) {
   const { week, matchupGroups, isLoading, isScheduleLoading, error } =
     useHomeScoreboard(seasonId);
+  const { data: powerRankings } = usePowerRankingsPreview(seasonId, 8);
   const track = useRef<HTMLUListElement>(null);
   const currentWeekStart = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -92,7 +94,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                     className="flex gap-2"
                   >
                     {matchups.map((matchup) => (
-                      <li key={matchup.id} className="w-24 shrink-0 snap-start">
+                      <li key={matchup.id} className="w-28 shrink-0 snap-start">
                         <Link
                           href={buildMatchupNavigationHref(matchup.id, {
                             from: "schedule",
@@ -108,6 +110,9 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                                 (entry) =>
                                   entry.id === matchup[`${side}TeamId`],
                               );
+                              const rank = powerRankings?.entries.find(
+                                (entry) => entry.team.id === team?.id,
+                              )?.rank;
                               const score = matchup[`${side}Score`];
                               return (
                                 <div
@@ -115,6 +120,16 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                                   title={team?.name ?? "Team TBD"}
                                   className="relative flex items-center justify-between gap-2"
                                 >
+                                  <span
+                                    className="w-2.5 shrink-0 text-[10px] font-medium tabular-nums text-slate-500"
+                                    aria-label={
+                                      rank && rank <= 8
+                                        ? `Power ranking ${rank}`
+                                        : undefined
+                                    }
+                                  >
+                                    {rank && rank <= 8 ? rank : null}
+                                  </span>
                                   {team?.logoUrl ? (
                                     <Image
                                       src={team.logoUrl}
