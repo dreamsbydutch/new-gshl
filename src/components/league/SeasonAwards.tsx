@@ -10,10 +10,12 @@ import {
   AWARD_GROUP_ORDER,
 } from "@gshl-lib/config/awards";
 import type {
+  AwardRaceCard,
   AllStarTeamCard,
   AllStarWinner,
   SeasonAwardsProps,
 } from "@gshl-types";
+import { buildAwardRaces } from "@gshl-utils/features/award-races";
 import {
   buildAllStarTeamCards,
   buildStandingsNavigationHref,
@@ -134,46 +136,27 @@ function AwardList({
   );
 }
 
-function AwardRaceRow({
-  awardLabel,
-  awardImageUrl,
-  contenderNames,
-}: {
-  awardLabel: string;
-  awardImageUrl: string | null;
-  contenderNames: string[];
-}) {
+function AwardRaceRow({ card }: { card: AwardRaceCard }) {
   return (
-    <li className="grid gap-2.5 px-4 py-3 sm:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] sm:items-center sm:px-5">
-      <div className="flex min-w-0 items-center gap-3">
-        <AwardIcon
-          imageUrl={awardImageUrl}
-          alt={awardLabel}
-          fallbackLabel="AWD"
-        />
-        <h3 className="min-w-0 truncate font-oswald text-lg leading-tight text-slate-950 sm:text-xl">
-          {awardLabel}
-        </h3>
-      </div>
-      <div className="min-w-0 pl-[3.25rem] sm:pl-0">
-        <span className="mb-2 block font-barlow text-[10px] uppercase tracking-[0.16em] text-slate-400 sm:hidden">
-          Contenders
-        </span>
-        <ul
-          className="flex flex-wrap gap-2"
-          aria-label={`${awardLabel} contenders`}
-        >
-          {contenderNames.map((name) => (
-            <li
-              key={name}
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
-            >
-              {name}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </li>
+    <section className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+      <h3 className="border-b border-slate-200 pb-2 font-oswald text-base leading-tight text-slate-950">
+        {card.title}
+      </h3>
+      <ul
+        className="mt-2 space-y-1"
+        aria-label={`${card.title} contenders, alphabetical order`}
+      >
+        {card.contenders.map((contender) => (
+          <li
+            key={contender.id}
+            className="flex min-w-0 items-center gap-2 text-sm leading-tight text-slate-700"
+          >
+            <WinnerLogo logoUrl={contender.logoUrl} fallbackLabel="GSHL" />
+            <span className="min-w-0 break-words">{contender.name}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -345,6 +328,7 @@ function AwardSection({
 }
 
 export function SeasonAwards({
+  teamStats,
   playerAwards,
   teamAwards,
   players,
@@ -381,7 +365,20 @@ export function SeasonAwards({
     0,
   );
   const isInProgress = isSeasonAwardsInProgress(season);
-  const hasContenders = awardCards.length > 0 || playerAwardWinnerCount > 0;
+  const races = useMemo(
+    () =>
+      buildAwardRaces({
+        season,
+        teams,
+        teamStats,
+        players,
+        playerTotals,
+        playerAwards,
+        teamAwards,
+      }),
+    [season, teams, teamStats, players, playerTotals, playerAwards, teamAwards],
+  );
+  const hasContenders = races.length > 0;
   const hasAwards =
     awardCards.length > 0 ||
     playerAwardWinnerCount > 0 ||
@@ -424,7 +421,7 @@ export function SeasonAwards({
     );
   }
 
-  if (!hasAwards) {
+  if (!isInProgress && !hasAwards) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-muted-foreground">
@@ -450,56 +447,10 @@ export function SeasonAwards({
           </p>
         </header>
 
-        <div className="mt-8 space-y-10">
-          {visibleGroups.map((group) => {
-            const groupCards = awardCards.filter(
-              (card) => card.catalog.group === group,
-            );
-
-            return (
-              <AwardSection
-                key={group}
-                eyebrow="Team award races"
-                title={group}
-                valueLabel="Contenders"
-              >
-                {groupCards.map((card) => (
-                  <AwardRaceRow
-                    key={card.id}
-                    awardLabel={card.catalog.fullName}
-                    awardImageUrl={card.catalog.imageUrl}
-                    contenderNames={[
-                      ...new Set([card.winnerName, ...card.nomineeNames]),
-                    ].sort((left, right) => left.localeCompare(right))}
-                  />
-                ))}
-              </AwardSection>
-            );
-          })}
-
-          {playerAwardWinnerCount > 0 ? (
-            <AwardSection
-              eyebrow="Player award races"
-              title="Individual honors"
-              valueLabel="Contenders"
-            >
-              {playerAwardSections.map((section) => (
-                <AwardRaceRow
-                  key={section.awardKey}
-                  awardLabel={section.title}
-                  awardImageUrl={section.iconUrl}
-                  contenderNames={[
-                    ...new Set(
-                      section.winners.flatMap((winner) => [
-                        winner.playerName,
-                        ...winner.nomineeNames,
-                      ]),
-                    ),
-                  ].sort((left, right) => left.localeCompare(right))}
-                />
-              ))}
-            </AwardSection>
-          ) : null}
+        <div className="mt-4 grid grid-cols-1 items-start gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {races.map((card) => (
+            <AwardRaceRow key={card.id} card={card} />
+          ))}
         </div>
       </section>
     );

@@ -121,6 +121,7 @@ function GSHLStandingsContent() {
   if (isAwardsView) {
     return (
       <SeasonAwards
+        teamStats={stats}
         playerAwards={playerAwards}
         teamAwards={teamAwards}
         players={players}

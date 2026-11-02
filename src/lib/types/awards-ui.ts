@@ -6,6 +6,7 @@ import type {
   PlayerTotalStatLine,
   Season,
   TeamAward,
+  TeamSeasonStatLine,
 } from "./database";
 import type {
   AwardCatalogEntry,
@@ -59,12 +60,19 @@ export interface PlayerAwardSection {
 }
 
 export interface SeasonAwardsProps {
+  teamStats: TeamSeasonStatLine[];
   playerAwards: PlayerAward[];
   teamAwards: TeamAward[];
   players: Player[];
   playerTotals: PlayerTotalStatLine[];
   season: Season | null;
   teams: GSHLTeam[];
+}
+
+export interface AwardRaceCard {
+  id: string;
+  title: string;
+  contenders: { id: string; name: string; logoUrl: string | null }[];
 }
 
 export interface AwardsShowcaseProps {

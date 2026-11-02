@@ -178,7 +178,7 @@ void test("standings views subscribe only to their rendered datasets", () => {
   });
   assert.deepEqual(getStandingsViewDataRequirements("awards"), {
     includeMatchups: false,
-    includeSeasonStats: false,
+    includeSeasonStats: true,
     includeWeeklyStats: false,
     includeWeeks: false,
   });
