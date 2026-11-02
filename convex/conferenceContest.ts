@@ -87,6 +87,9 @@ export const view = query({
         id: String(team._id),
         seasonId: String(team.seasonId),
         franchiseId: String(team.franchiseId),
+        name: franchise?.name ?? null,
+        abbr: franchise?.abbr ?? null,
+        logoUrl: franchise?.logoUrl ?? null,
         confId: String(team.confId),
         confName: conference?.name ?? null,
         confAbbr: conference?.abbr ?? null,
@@ -142,6 +145,8 @@ export const view = query({
     return projectConferenceContestBrowserView({
       overall,
       seasons: seasonViewModels,
+      gshlTeams: teams,
+      teamAwards,
     });
   },
 });
