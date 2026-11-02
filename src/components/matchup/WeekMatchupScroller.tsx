@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useWeeklyScheduleSummary } from "@gshl-hooks/main/useWeeklySchedule";
+import { usePowerRankingsPreview } from "@gshl-hooks/main/usePowerRankings";
 import { buildMatchupNavigationHref } from "@gshl-utils";
 
 export function WeekMatchupScroller({
@@ -16,6 +17,7 @@ export function WeekMatchupScroller({
   matchupId: string;
 }) {
   const { data, isLoading } = useWeeklyScheduleSummary({ seasonId, weekId });
+  const { data: powerRankings } = usePowerRankingsPreview(seasonId, 8);
   const track = useRef<HTMLUListElement>(null);
   const selected = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -43,7 +45,7 @@ export function WeekMatchupScroller({
             <li
               key={matchup.id}
               ref={matchup.id === matchupId ? selected : undefined}
-              className="w-20 shrink-0 snap-start"
+              className="w-24 shrink-0 snap-start"
             >
               <Link
                 href={buildMatchupNavigationHref(matchup.id, {
@@ -59,12 +61,25 @@ export function WeekMatchupScroller({
                   const team = data.teams.find(
                     (team) => team.id === matchup[`${side}TeamId`],
                   );
+                  const rank = powerRankings?.entries.find(
+                    (entry) => entry.team.id === team?.id,
+                  )?.rank;
                   return (
                     <div
                       key={side}
                       title={team?.name ?? "Team TBD"}
                       className="flex items-center justify-between gap-2"
                     >
+                      <span
+                        className="w-2.5 shrink-0 text-[10px] font-medium tabular-nums text-slate-500"
+                        aria-label={
+                          rank && rank <= 8
+                            ? `Power ranking ${rank}`
+                            : undefined
+                        }
+                      >
+                        {rank && rank <= 8 ? rank : null}
+                      </span>
                       {team?.logoUrl ? (
                         <Image
                           src={team.logoUrl}
