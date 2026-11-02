@@ -137,25 +137,42 @@ function AwardList({
 }
 
 function AwardRaceRow({ card }: { card: AwardRaceCard }) {
+  const List = card.ranked ? "ol" : "ul";
   return (
     <section className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-      <h3 className="border-b border-slate-200 pb-2 font-oswald text-base leading-tight text-slate-950">
-        {card.title}
-      </h3>
-      <ul
+      <header className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <AwardIcon imageUrl={card.imageUrl} alt="" fallbackLabel="AWD" />
+        <h3 className="min-w-0 font-oswald text-sm leading-tight text-slate-950">
+          {card.title}
+        </h3>
+      </header>
+      <List
         className="mt-2 space-y-1"
-        aria-label={`${card.title} contenders, alphabetical order`}
+        aria-label={`${card.title} ${card.ranked ? "leaders, ranked order" : "finalists, unranked"}`}
       >
-        {card.contenders.map((contender) => (
+        {card.contenders.map((contender, index) => (
           <li
             key={contender.id}
             className="flex min-w-0 items-center gap-2 text-sm leading-tight text-slate-700"
           >
+            {card.ranked ? (
+              <span
+                className="w-2 shrink-0 text-[10px] tabular-nums text-slate-400"
+                aria-hidden="true"
+              >
+                {index + 1}
+              </span>
+            ) : null}
             <WinnerLogo logoUrl={contender.logoUrl} fallbackLabel="GSHL" />
             <span className="min-w-0 break-words">{contender.name}</span>
+            {card.ranked ? (
+              <span className="ml-auto shrink-0 pl-1 text-xs tabular-nums text-slate-400">
+                {contender.stat}
+              </span>
+            ) : null}
           </li>
         ))}
-      </ul>
+      </List>
     </section>
   );
 }
@@ -434,23 +451,26 @@ export function SeasonAwards({
   if (isInProgress) {
     return (
       <section className="mx-auto max-w-6xl px-4 pb-12 pt-4 sm:px-6 lg:pt-6">
-        <header className="border-b border-slate-200 pb-6">
-          <p className="font-barlow text-sm uppercase text-slate-400">
-            {season?.year ? `${season.year} Award Races` : "Award Races"}
-          </p>
-          <h1 className="mt-2 font-oswald text-3xl text-slate-950 sm:text-4xl">
-            Contenders
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-            A live look at the players and teams in contention. Names are
-            presented without ranking until the season is complete.
-          </p>
-        </header>
-
-        <div className="mt-4 grid grid-cols-1 items-start gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {races.map((card) => (
-            <AwardRaceRow key={card.id} card={card} />
-          ))}
+        <h1 className="font-oswald text-xl text-slate-950">Award races</h1>
+        <div className="mt-3 space-y-5">
+          {[true, false].map((ranked) => {
+            const cards = races.filter((card) => card.ranked === ranked);
+            return cards.length > 0 ? (
+              <section
+                key={String(ranked)}
+                aria-label={ranked ? "Leaders" : "Unranked finalists"}
+              >
+                <h2 className="mb-2 font-barlow text-xs uppercase tracking-wide text-slate-500">
+                  {ranked ? "Leaders" : "Unranked finalists"}
+                </h2>
+                <div className="grid grid-cols-1 items-start gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {cards.map((card) => (
+                    <AwardRaceRow key={card.id} card={card} />
+                  ))}
+                </div>
+              </section>
+            ) : null;
+          })}
         </div>
       </section>
     );
