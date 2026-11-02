@@ -64,7 +64,7 @@ export function getStandingsViewDataRequirements(
 
   return {
     includeMatchups: allowMatchups && isPlayoff,
-    includeSeasonStats: !isAwards && (isTeamStandings || isPower || isPlayoff),
+    includeSeasonStats: isAwards || isTeamStandings || isPower || isPlayoff,
     includeWeeklyStats: isPower,
     includeWeeks: isPower,
   };
