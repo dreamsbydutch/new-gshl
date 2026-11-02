@@ -138,20 +138,15 @@ const getMatchupWinner = (
     "gameType" | "homeWin" | "awayWin" | "tie" | "homeScore" | "awayScore"
   >,
 ): ConferenceContestWinner => {
-  const playoff = isPlayoffMatchupType(matchup.gameType);
   const homeScore = normalizeScore(matchup.homeScore);
   const awayScore = normalizeScore(matchup.awayScore);
-  if (playoff && homeScore != null && awayScore != null) {
+  if (homeScore != null && awayScore != null) {
     return homeScore >= awayScore ? "home" : "away";
   }
-  if (playoff && normalizeBoolean(matchup.tie) === true) return "home";
+  if (normalizeBoolean(matchup.tie) === true) return "home";
   if (normalizeBoolean(matchup.homeWin) === true) return "home";
   if (normalizeBoolean(matchup.awayWin) === true) return "away";
-  if (normalizeBoolean(matchup.tie) === true) return "tie";
-  if (homeScore == null || awayScore == null) return "unknown";
-  if (homeScore > awayScore) return "home";
-  if (awayScore > homeScore) return "away";
-  return "tie";
+  return "unknown";
 };
 
 const emptyRecordMap = (conferenceIds: string[]) =>

@@ -507,3 +507,54 @@ void test("AI preparation connects owner history, opponents and dated results wi
     /private@example|owing|"homeScore":99/,
   );
 });
+
+void test("weekly recap compares entering ranks with next week's ranks", async () => {
+  const f = fixture();
+  f.put("franchises", "club", {
+    name: "Poo Balances",
+    abbr: "PB",
+    ownerId: "owner",
+  });
+  f.put("teams", "t", { seasonId: "s", franchiseId: "club", confId: "c" });
+  f.put("playerWeekStatLines", "pw", {
+    seasonId: "s",
+    weekId: "w",
+    playerId: "p",
+    gshlTeamId: "t",
+  });
+  f.put("teamWeekStatLines", "current", {
+    seasonId: "s",
+    weekId: "w",
+    gshlTeamId: "t",
+    powerRk: 4,
+  });
+  f.put("weeks", "previous", {
+    seasonId: "s",
+    weekNum: 0,
+    startDate: "2025-09-24",
+    endDate: "2025-09-30",
+  });
+  f.put("teamWeekStatLines", "old", {
+    seasonId: "s",
+    weekId: "previous",
+    gshlTeamId: "t",
+    powerRk: 9,
+  });
+  f.put("teamWeekStatLines", "next", {
+    seasonId: "s",
+    weekId: "future",
+    gshlTeamId: "t",
+    powerRk: 7,
+  });
+  const prepared = (await invokeMutation(prepareAiGeneration, f.ctx, {
+    seasonId: "s",
+    weekId: "w",
+    issueType: "weekly",
+  })) as { facts: WeeklyEditionFactPacket };
+  assert.equal(prepared.facts.powerMovers[0]?.previousRank, 4);
+  assert.equal(prepared.facts.powerMovers[0]?.currentRank, 7);
+  assert.equal(prepared.facts.powerMovers[0]?.rankChange, -3);
+  await f.ctx.db.delete("next" as never);
+  const missing = await invokeMutation(prepareAiGeneration, f.ctx, { seasonId: "s", weekId: "w", issueType: "weekly" }) as { facts: WeeklyEditionFactPacket };
+  assert.deepEqual(missing.facts.powerMovers, []);
+});
