@@ -54,6 +54,7 @@ export const ADMIN_NAVIGATION_VIEWS = [
   "scheduleBuilder",
   "draftPicks",
   "contracts",
+  "trades",
   "users",
   "jobs",
   "newsroom",

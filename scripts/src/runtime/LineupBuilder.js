@@ -494,6 +494,10 @@ var LineupBuilder = (function () {
     if (Math.abs(candidate.rating - current.rating) >= 0.000001) {
       return candidate.rating > current.rating;
     }
+    // Equal objective values are not evidence of a bad coaching choice.
+    if ((candidate.startedCount || 0) !== (current.startedCount || 0)) {
+      return (candidate.startedCount || 0) > (current.startedCount || 0);
+    }
     return false;
   }
 
@@ -711,6 +715,12 @@ var LineupBuilder = (function () {
           var proposed = {
             rating: current.rating + candidate.rating,
             count: current.count + 1,
+            startedCount:
+              (current.startedCount || 0) +
+              (isPlayedGame(candidate.player) &&
+              wasInDailyLineup(candidate.player)
+                ? 1
+                : 0),
             playerId: candidate.player.playerId,
             position: position,
             previous: current,
@@ -777,6 +787,12 @@ var LineupBuilder = (function () {
           var proposed = {
             rating: current.rating + candidate.rating,
             count: current.count + 1,
+            startedCount:
+              (current.startedCount || 0) +
+              (isPlayedGame(candidate.player) &&
+              wasInDailyLineup(candidate.player)
+                ? 1
+                : 0),
             playerId: candidate.player.playerId,
             position: slotList[slotIndex].position,
             previous: current,
@@ -1043,7 +1059,10 @@ var LineupBuilder = (function () {
     }
 
     const bestPosPriority = results
-      .slice()
+      // Hindsight choices require an actual appearance. Non-playing zeroes must
+      // not displace a played zero or a negative-rated goalie and create BS
+      // on a night with no playing bench alternative.
+      .filter(isPlayedGame)
       .sort((a, b) => ratingValue(b) - ratingValue(a));
     const bestPosAssignments = findBestLineup(bestPosPriority, false, slotList);
     for (const result of results) {
@@ -1719,7 +1738,7 @@ var LineupBuilder = (function () {
     return { ok: true };
   }
 
-  function regression_bestPosUsesRatingOnly() {
+  function regression_bestPosUsesPlayedRatingsOnly() {
     var roster = [
       {
         playerId: "played-rw",
@@ -1740,9 +1759,9 @@ var LineupBuilder = (function () {
     var optimized = optimizeLineup(roster);
     assert(
       optimized.find(function (p) {
-        return p.playerId === "no-game-rw";
+        return p.playerId === "played-rw";
       }).bestPos !== RosterPosition.BN,
-      "Expected bestPos to use higher-rated non-playing player",
+      "Expected daily bestPos to use a played player over a non-playing player",
     );
     return { ok: true };
   }

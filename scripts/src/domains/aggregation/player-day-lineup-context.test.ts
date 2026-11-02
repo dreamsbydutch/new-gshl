@@ -3,6 +3,106 @@ import test from "node:test";
 import { getLineupBuilder } from "../lineup/lineup-builder";
 import { refreshPlayerDayLineupContext } from "./player-day-lineup-context";
 
+void test("daily bad starts require a played alternative, including zero-rated skaters and negative-rated goalies", async () => {
+  const builder = await getLineupBuilder();
+  for (const [position, posGroup, rating] of [
+    ["C", "F", 0],
+    ["G", "G", -7.94307],
+  ] as const) {
+    const source = [
+      {
+        seasonId: "s",
+        gshlTeamId: "t",
+        date: "2026-10-20",
+        playerId: "z-starter",
+        nhlPos: [position],
+        posGroup,
+        GP: "1",
+        GS: "1",
+        dailyPos: position,
+        Rating: rating,
+      },
+      {
+        seasonId: "s",
+        gshlTeamId: "t",
+        date: "2026-10-20",
+        playerId: "a-inactive",
+        nhlPos: [position],
+        posGroup,
+        GP: "",
+        GS: "",
+        dailyPos: "BN",
+        Rating: 0,
+      },
+    ];
+    const result = refreshPlayerDayLineupContext(
+      source,
+      builder.optimizeLineup,
+      builder.buildLineupStructureFromRosterSpots?.([position, "BN"]),
+    );
+    assert.equal(
+      result[0]!.BS,
+      "",
+      `${position}: no played alternative means no bad start`,
+    );
+    assert.equal(result[0]!.bestPos, position);
+    assert.equal(result[1]!.bestPos, "BN");
+    assert.equal(result[0]!.GS, "1");
+  }
+});
+
+void test("equal-rated played alternatives preserve the actual starter rather than inventing a bad start", async () => {
+  const builder = await getLineupBuilder();
+  const source = [
+    {
+      seasonId: "s",
+      gshlTeamId: "t",
+      date: "2026-10-20",
+      playerId: "z-starter",
+      nhlPos: ["C"],
+      posGroup: "F",
+      GP: "1",
+      GS: "1",
+      dailyPos: "C",
+      Rating: 10,
+    },
+    {
+      seasonId: "s",
+      gshlTeamId: "t",
+      date: "2026-10-20",
+      playerId: "a-bench",
+      nhlPos: ["C"],
+      posGroup: "F",
+      GP: "1",
+      GS: "",
+      dailyPos: "BN",
+      Rating: 10,
+    },
+  ];
+  const result = refreshPlayerDayLineupContext(
+    source,
+    builder.optimizeLineup,
+    builder.buildLineupStructureFromRosterSpots?.(["C", "BN"]),
+  );
+  assert.equal(result[0]!.BS, "");
+  assert.equal(result[0]!.bestPos, "C");
+  assert.equal(result[1]!.bestPos, "BN");
+
+  // Exercise the custom-slot search too: the same position has different eligibility.
+  const custom = refreshPlayerDayLineupContext(
+    [...source, { ...source[0]!, playerId: "z-second-starter" }],
+    builder.optimizeLineup,
+    [
+      { position: "C", eligiblePositions: ["C"] },
+      { position: "C", eligiblePositions: ["C", "LW"] },
+    ],
+  );
+  assert(custom.every((row) => row.BS === ""));
+  assert.equal(custom[0]!.bestPos, "C");
+  assert.equal(custom[2]!.bestPos, "C");
+  assert.equal(custom[1]!.bestPos, "BN");
+});
+
 void test("live days retain stats and recorded slots without running hindsight optimization", () => {
   const source = [
     {

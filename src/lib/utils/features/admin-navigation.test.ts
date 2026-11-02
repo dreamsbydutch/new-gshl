@@ -14,6 +14,7 @@ void test("admin navigation accepts every dedicated admin view", () => {
     "draftPicks",
     "scheduleBuilder",
     "contracts",
+    "trades",
     "nhlContracts",
     "nhlRosters",
     "users",

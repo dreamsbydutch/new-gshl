@@ -1,3 +1,5 @@
+import type { LeagueTradeSummary } from "./trades";
+
 export type LeagueActivityType =
   | "signing"
   | "trade"
@@ -15,6 +17,8 @@ export interface LeagueActivityEvent {
   teamName: string;
   teamAbbr: string | null;
   teamLogoUrl: string | null;
+  weeklyAddCount?: number | null;
+  trade?: LeagueTradeSummary;
   signingStatus?: string;
   contractLength?: number;
   contractSalary?: number;

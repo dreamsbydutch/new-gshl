@@ -43,6 +43,7 @@ export type AdminNavigationView =
   | "accounts"
   | "draftPicks"
   | "contracts"
+  | "trades"
   | "users"
   | "jobs"
   | "newsroom"

@@ -147,6 +147,7 @@ export interface PowerRankingEntry {
   team: PowerRankingTeam;
   rank: number;
   rating: number | null;
+  ratingChange: number | null;
   performance?: number | null;
   elo?: number | null;
   talent?: number | null;
@@ -206,6 +207,7 @@ export interface PowerRankingPreviewEntry {
   team: Pick<GSHLTeam, "id" | "name" | "abbr" | "logoUrl">;
   rank: number;
   rating: number | null;
+  ratingChange: number | null;
   rankChange: number | null;
   color: string;
 }

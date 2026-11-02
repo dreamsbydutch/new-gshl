@@ -21,8 +21,12 @@ import {
   cancelJob as cancelManagedJob,
   retryJob as retryManagedJob,
 } from "./lib/jobLifecycle";
-import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
+import {
+  buildLeagueActivity,
+  limitLeagueActivity,
+} from "../src/lib/utils/features/league-activity";
 import { loadLineupShame } from "./lib/lineupShame";
+import { projectTrade } from "./lib/tradeProjection";
 import { countGshlPlayersByNhlTeam } from "../src/lib/utils/features/nhl";
 import { buildSigningValues } from "../src/lib/utils/features/signing-value";
 import { JOB_NAMES, JOB_STATUSES } from "./jobCatalog";
@@ -769,6 +773,7 @@ export const powerRankingsPreview = query({
         },
         rank: entry.rank,
         rating: entry.rating,
+        ratingChange: entry.ratingChange,
         rankChange: entry.rankChange,
         color: entry.color,
       })),
@@ -1251,6 +1256,7 @@ export const activity = query({
   args: {
     seasonId: v.id("seasons"),
     take: v.number(),
+    grouped: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const archived = await ctx.db
@@ -1258,12 +1264,35 @@ export const activity = query({
       .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
       .first();
     if (archived?.status === "archived") {
-      return archived.activitySnapshot.slice(
-        0,
+      return limitLeagueActivity(
+        archived.activitySnapshot,
         Math.min(Math.max(args.take, 1), 30),
+        args.grouped === true,
       ) as ReturnType<typeof buildLeagueActivity>;
     }
-    const [contracts, playerDays, teams, franchises] = await Promise.all([
+    const weeks = await rows(ctx, "weeks", { where: { seasonId: args.seasonId } });
+    const latestDay = await ctx.db
+      .query("playerDayStatLines")
+      .withIndex("by_seasonId_date", (q) => q.eq("seasonId", args.seasonId))
+      .order("desc")
+      .first();
+    const latestDate = latestDay?.date ?? "";
+    const lookback = latestDate ? new Date(`${latestDate}T12:00:00Z`) : null;
+    lookback?.setUTCDate(lookback.getUTCDate() - 7);
+    const lookbackDate = lookback?.toISOString().slice(0, 10) ?? "";
+    // Read the complete league week, plus a preceding roster for drop detection.
+    const coveredWeekStarts = weeks.flatMap((week) => {
+      const from = utcTimestampToDateKey(week.startDate);
+      const through = utcTimestampToDateKey(week.endDate);
+      return from && through && through >= lookbackDate && from <= latestDate
+        ? [from]
+        : [];
+    });
+    const start = [lookbackDate, ...coveredWeekStarts].sort()[0] ?? lookbackDate;
+    const startInstant = start ? new Date(`${start}T12:00:00Z`) : null;
+    startInstant?.setUTCDate(startInstant.getUTCDate() - 1);
+    const readFrom = startInstant?.toISOString().slice(0, 10) ?? "";
+    const [contracts, playerDays, teams, franchises, trades] = await Promise.all([
       (ctx.db as any)
         .query("contracts")
         .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
@@ -1279,15 +1308,22 @@ export const activity = query({
         ),
       (ctx.db as any)
         .query("playerDayStatLines")
-        .withIndex("by_seasonId_date", (q) => q.eq("seasonId", args.seasonId))
+        .withIndex("by_seasonId_date", (q) =>
+          q.eq("seasonId", args.seasonId)
+            .gte("date", readFrom)
+            .lte("date", latestDate),
+        )
         .order("desc")
-        .take(1500),
+        .take(8001),
       (ctx.db as any)
         .query("teams")
         .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
         .collect(),
       ctx.db.query("franchises").collect(),
+      ctx.db.query("trades").withIndex("by_seasonId_effectiveDate", q=>q.eq("seasonId",args.seasonId)).order("desc").take(30),
     ]);
+    if (playerDays.length === 8001)
+      throw Error("Activity exceeds its supported date scope");
     const playerIds = new Set<string>();
     contracts.forEach((row) => playerIds.add(row.playerId));
     playerDays.forEach((row) => playerIds.add(row.playerId));
@@ -1310,6 +1346,10 @@ export const activity = query({
         publicRow(row as unknown as Row),
       ) as never,
       limit: Math.min(Math.max(args.take, 1), 30),
+      weeks,
+      perTypeLimit: args.grouped === true,
+      rosterStartDate: start,
+      trades: trades.map(projectTrade),
     });
   },
 });

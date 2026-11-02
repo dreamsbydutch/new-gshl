@@ -11,6 +11,9 @@ These analytical counters use the definitions confirmed by the commissioner on
   on the bench in the best feasible lineup for that roster and date. This
   includes goalies. The benched player who would improve the lineup does not
   receive BS.
+  Only players who actually appeared are candidates for this daily hindsight
+  lineup. Non-playing players cannot replace a starter, and equal-rated
+  alternatives preserve actual starters rather than inventing bad starts.
 - **MG — missed game:** the player's NHL team completed an eligible regular
   season or playoff game, but the player did not appear. This applies to every
   fantasy slot, including bench and IR. Future, live, postponed and cancelled
@@ -47,6 +50,9 @@ rows identify the actual missed skaters and highlight their teams.
 Coaching percentage is `100 × (1 − BS / (GP − GS − MS))`, as confirmed by the
 commissioner. Start decisions are `GP − GS − MS`; higher percentages are better.
 Zero decisions or inconsistent counts are unavailable, never an invented 100%.
+BS must not exceed either GS or the decision count; negative percentages are
+invalid. Correct the daily hindsight flags and their aggregates rather than
+clamping the percentage or displaying negative results.
 Sum native counts before calculating the percentage; never average daily rates.
 
 The card combines earlier team-day totals with the fresh completed night's

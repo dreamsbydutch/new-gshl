@@ -7,10 +7,12 @@ import type {
   Player,
   PlayerDayStatLine,
   Team,
+  Week,
 } from "@gshl-types";
 import { ContractStatus } from "../domain/constants";
 import { normalizeDateOnlyValue } from "../core/date";
 import { toNumber } from "../core/data";
+import type { LeagueTradeSummary } from "../../types/trades";
 
 type ContractSource = Pick<
   Contract,
@@ -40,6 +42,10 @@ interface BuildLeagueActivityOptions {
   players: PlayerSource[];
   teams: TeamSource[];
   franchises: FranchiseSource[];
+  weeks?: Pick<Week, "id" | "startDate" | "endDate">[];
+  perTypeLimit?: boolean;
+  rosterStartDate?: string;
+  trades?: readonly LeagueTradeSummary[];
   limit?: number;
 }
 
@@ -64,14 +70,35 @@ function previousCalendarDate(date: string): string {
   return value.toISOString().slice(0, 10);
 }
 
+/** Keep each transaction list visible even when another kind is much busier. */
+export function limitLeagueActivity(
+  events: readonly LeagueActivityEvent[],
+  limit: number,
+  perType: boolean,
+): LeagueActivityEvent[] {
+  if (!perType) return events.slice(0, Math.max(0, limit));
+  const counts = new Map<LeagueActivityType, number>();
+  return events.filter((event) => {
+    if (event.type === "missed_start") return false;
+    const count = (counts.get(event.type) ?? 0) + 1;
+    counts.set(event.type, count);
+    return count <= Math.max(0, limit);
+  });
+}
+
 export function buildLeagueActivity({
   contracts,
   playerDays,
   players,
   teams,
   franchises,
+  weeks = [],
+  perTypeLimit = false,
+  rosterStartDate,
+  trades: recordedTrades,
   limit = 12,
 }: BuildLeagueActivityOptions): LeagueActivityEvent[] {
+  const trades = recordedTrades ?? [];
   const playerById = new Map(
     players.map((player) => [String(player.id), player]),
   );
@@ -100,25 +127,73 @@ export function buildLeagueActivity({
   const events: LeagueActivityEvent[] = [];
   const seen = new Set<string>();
   const push = (event: LeagueActivityEvent) => {
-    const key = `${event.type}:${event.date}:${event.teamId ?? "none"}:${event.playerId}`;
+    if (
+      rosterStartDate &&
+      event.date < rosterStartDate &&
+      event.type !== "signing" &&
+      event.type !== "trade"
+    )
+      return;
+    const key = event.trade
+      ? event.id
+      : `${event.type}:${event.date}:${event.teamId ?? "none"}:${event.playerId}`;
     if (seen.has(key)) return;
     seen.add(key);
     events.push(event);
   };
 
+  for (const trade of trades)
+    push({
+      id: `trade:${trade.id}`,
+      type: "trade",
+      date: trade.date,
+      playerId: "",
+      playerName: `${trade.teamA.name} ↔ ${trade.teamB.name}`,
+      teamId: null,
+      teamName: "",
+      teamAbbr: null,
+      teamLogoUrl: null,
+      trade,
+    });
+  const tradedAdds = new Set(
+    trades.flatMap((t) =>
+      t.players.map((p) => `${t.date}:${p.toTeamId}:${p.playerId}`),
+    ),
+  );
+  const tradedDrops = new Set(
+    trades.flatMap((t) =>
+      t.players.map((p) => `${t.date}:${p.fromTeamId}:${p.playerId}`),
+    ),
+  );
   contracts.forEach((contract) => {
     const date = normalizeDateOnlyValue(contract.signingDate);
     const isTrade = contract.signingStatus === ContractStatus.TRADE;
+    // New grouped feeds have an authoritative ledger; legacy archive snapshots
+    // can still display their recorded contract-transfer notices.
+    if (isTrade && perTypeLimit && recordedTrades !== undefined) return;
+    if (
+      isTrade &&
+      trades.some(
+        (t) =>
+          t.date === date &&
+          t.players.some((p) => p.playerId === String(contract.playerId)),
+      )
+    )
+      return;
     if (!date || (!SIGNING_STATUSES.has(contract.signingStatus) && !isTrade)) {
       return;
     }
 
-    const franchise = franchiseByOwnerId.get(String(contract.ownerId));
     const team = teams.find(
       (candidate) =>
         String(candidate.seasonId) === String(contract.seasonId) &&
-        String(candidate.franchiseId) === String(franchise?.id ?? ""),
+        String(
+          franchiseById.get(String(candidate.franchiseId))?.ownerId ?? "",
+        ) === String(contract.ownerId),
     );
+    const franchise = team
+      ? franchiseById.get(String(team.franchiseId))
+      : franchiseByOwnerId.get(String(contract.ownerId));
     push({
       id: `signing:${contract.id}`,
       type: isTrade ? "trade" : "signing",
@@ -147,7 +222,10 @@ export function buildLeagueActivity({
     rosterByDate.set(date, teamsForDate);
 
     const team = teamById.get(teamId);
-    if (toNumber(row.ADD, 0) > 0) {
+    if (
+      toNumber(row.ADD, 0) > 0 &&
+      !tradedAdds.has(`${date}:${teamId}:${playerId}`)
+    ) {
       push({
         id: `add:${row.id}`,
         type: "add",
@@ -179,6 +257,7 @@ export function buildLeagueActivity({
 
       yesterdayRoster.forEach((playerId) => {
         if (todayRoster.has(playerId)) return;
+        if (tradedDrops.has(`${date}:${teamId}:${playerId}`)) return;
         push({
           id: `drop:${date}:${teamId}:${playerId}`,
           type: "drop",
@@ -191,13 +270,36 @@ export function buildLeagueActivity({
     });
   });
 
-  return events
-    .sort((left, right) => {
+  const weekFor = (date: string) =>
+    weeks.find((week) => {
+      const start = normalizeDateOnlyValue(week.startDate);
+      const end = normalizeDateOnlyValue(week.endDate);
+      return start && end && date >= start && date <= end;
+    });
+  const weeklyAdds = new Map<string, number>();
+  for (const event of events) {
+    if (event.type !== "add") continue;
+    const week = weekFor(event.date);
+    if (!week) continue;
+    const key = `${event.teamId}:${week.id}`;
+    weeklyAdds.set(key, (weeklyAdds.get(key) ?? 0) + 1);
+  }
+  for (const event of events) {
+    if (event.type !== "add") continue;
+    const week = weekFor(event.date);
+    event.weeklyAddCount = week
+      ? (weeklyAdds.get(`${event.teamId}:${week.id}`) ?? null)
+      : null;
+  }
+  return limitLeagueActivity(
+    events.sort((left, right) => {
       const dateDelta = right.date.localeCompare(left.date);
       if (dateDelta !== 0) return dateDelta;
       const typeDelta = TYPE_PRIORITY[left.type] - TYPE_PRIORITY[right.type];
       if (typeDelta !== 0) return typeDelta;
       return left.playerName.localeCompare(right.playerName);
-    })
-    .slice(0, Math.max(0, limit));
+    }),
+    limit,
+    perTypeLimit,
+  );
 }

@@ -37,7 +37,8 @@ export function coachingPercentage(
   )
     return null;
   const decisions = gamesPlayed - gamesStarted - missedStarts;
-  if (decisions <= 0 || badStarts < 0 || badStarts > decisions) return null;
+  if (decisions <= 0 || badStarts > gamesStarted || badStarts > decisions)
+    return null;
   return 100 * (1 - badStarts / decisions);
 }
 

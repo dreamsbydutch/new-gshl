@@ -15,6 +15,7 @@ const ADMIN_TABS: ReadonlyArray<{
 }> = [
   { key: "accounts", label: "Accounts" },
   { key: "contracts", label: "Contracts" },
+  { key: "trades", label: "Trades" },
   { key: "nhlContracts", label: "NHL Salaries & Talent" },
   { key: "nhlRosters", label: "NHL Teams" },
   { key: "draftPicks", label: "Draft Picks" },

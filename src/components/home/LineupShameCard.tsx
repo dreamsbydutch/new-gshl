@@ -219,7 +219,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                           {entry.coachingPercentage === null
                             ? entry.startDecisions === 0
                               ? "No decisions"
-                              : "Check counts"
+                              : "Unavailable"
                             : `${entry.badStarts} / ${entry.startDecisions}`}
                         </span>
                       </td>
@@ -229,31 +229,6 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
               </table>
             </div>
           </div>
-          <footer className="border-t border-slate-100 px-3 py-3 sm:px-5">
-            <details className="text-xs text-slate-500">
-              <summary className="min-h-6 cursor-pointer font-semibold text-slate-600">
-                How coaching % works
-              </summary>
-              <div className="mt-2 space-y-1.5 leading-5">
-                <p>
-                  Coaching % = 100 × (1 − bad starts ÷ start decisions). Higher
-                  is better.
-                </p>
-                <p>
-                  Start decisions = games played − games started − missed
-                  starts. A team with no decisions gets “—”, not a perfect
-                  score.
-                </p>
-                <p>
-                  MS counts played bench/IR skaters who could have filled an
-                  open starting slot. BS counts played starters left out of the
-                  best feasible lineup. Season totals include regular season and
-                  playoffs, through the last completed night. Tied MS totals
-                  share a rank.
-                </p>
-              </div>
-            </details>
-          </footer>
         </>
       )}
     </section>

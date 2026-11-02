@@ -118,10 +118,11 @@ void test("builds the latest power order, movement, and weekly chart", () => {
       rank: entry.rank,
       change: entry.rankChange,
       rating: entry.rating,
+      ratingChange: entry.ratingChange,
     })),
     [
-      { id: "a", rank: 1, change: 1, rating: 55 },
-      { id: "b", rank: 2, change: -1, rating: 45 },
+      { id: "a", rank: 1, change: 1, rating: 55, ratingChange: 7 },
+      { id: "b", rank: 2, change: -1, rating: 45, ratingChange: -7 },
     ],
   );
   assert.deepEqual(
@@ -130,6 +131,34 @@ void test("builds the latest power order, movement, and weekly chart", () => {
       ["Week 1", 2, 1],
       ["Week 2", 1, 2],
     ],
+  );
+});
+
+void test("score changes require two recorded scores and preserve a genuine zero", () => {
+  const input = {
+    teams: [makeTeam("a", "Alpha")],
+    weeks: [makeWeek(1), makeWeek(2)],
+    seasonStats: [],
+  };
+  for (const [previous, current, expected] of [
+    [0, 5, 5],
+    [5, 5, 0],
+    [null, 5, null],
+    [5, null, null],
+  ] as const) {
+    const result = buildPowerRankings({
+      ...input,
+      weeklyStats: [
+        { ...weekly("a", 1, 1, 0), powerRating: previous },
+        { ...weekly("a", 2, 1, 0), powerRating: current },
+      ],
+    });
+    assert.equal(result.entries[0]?.ratingChange, expected);
+  }
+  assert.equal(
+    buildPowerRankings({ ...input, weeklyStats: [weekly("a", 2, 1, 5)] })
+      .entries[0]?.ratingChange,
+    null,
   );
 });
 

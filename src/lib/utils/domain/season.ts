@@ -475,7 +475,7 @@ export function usesLegacyTieRules(
  */
 export function calculateStandingsPoints(
   stats:
-    | Pick<TeamSeasonStatLine, "teamW" | "teamHW" | "teamHL" | "teamT">
+    | Partial<Pick<TeamSeasonStatLine, "teamW" | "teamHW" | "teamHL" | "teamT">>
     | null
     | undefined,
   season: Pick<Season, "usesLegacyTies"> | null | undefined,
