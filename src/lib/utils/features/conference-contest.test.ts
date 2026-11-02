@@ -218,7 +218,7 @@ void test("uses the most recent season first when there is no current season", (
   );
 });
 
-void test("counts ties as half a win and weights leadership awards triple", () => {
+void test("awards tied games to the home team and weights leadership awards triple", () => {
   const teams = [
     team("left", "s1", "A", "Alpha"),
     team("right", "s1", "B", "Beta"),
@@ -239,9 +239,9 @@ void test("counts ties as half a win and weights leadership awards triple", () =
     ],
   });
   assert.ok(result);
-  assert.equal(result.headToHeadRecordByConferenceId.A?.ties, 1);
-  assert.equal(result.headToHeadRecordByConferenceId.B?.ties, 1);
-  assert.equal(result.componentsByConferenceId.A?.headToHead, 50);
+  assert.equal(result.headToHeadRecordByConferenceId.A?.ties, 0);
+  assert.equal(result.headToHeadRecordByConferenceId.B?.losses, 1);
+  assert.equal(result.componentsByConferenceId.A?.headToHead, 100);
   assert.equal(result.awardPointsByConferenceId.A, 0);
   assert.equal(result.awardPointsByConferenceId.B, 6);
 });

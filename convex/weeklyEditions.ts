@@ -321,6 +321,7 @@ async function buildSource(
       : null;
   const [
     previousPower,
+    nextPower,
     nextMatchups,
     playerDays,
     teamDays,
@@ -335,6 +336,12 @@ async function buildSource(
       ? ctx.db
           .query("teamWeekStatLines")
           .withIndex("by_weekId", (q) => q.eq("weekId", previousWeek._id))
+          .collect()
+      : [],
+    nextWeek
+      ? ctx.db
+          .query("teamWeekStatLines")
+          .withIndex("by_weekId", (q) => q.eq("weekId", nextWeek._id))
           .collect()
       : [],
     nextWeek
@@ -449,8 +456,8 @@ async function buildSource(
       ),
     ]),
   );
-  const previousByTeam = new Map(
-    previousPower.map((row) => [String(row.gshlTeamId), row]),
+  const nextPowerByTeam = new Map(
+    nextPower.map((row) => [String(row.gshlTeamId), row]),
   );
   const currentPowerByTeam = new Map(
     currentPower.map((row) => [String(row.gshlTeamId), row]),
@@ -1211,17 +1218,23 @@ async function buildSource(
         wins: row.W,
       };
     }),
-    power: currentPower.map((row) => {
-      const previous = previousByTeam.get(String(row.gshlTeamId));
-      return {
-        teamId: String(row.gshlTeamId),
-        teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
-        currentRank: row.powerRk,
-        previousRank: previous?.powerRk ?? row.powerRk,
-        currentElo: row.powerEloPost ?? row.powerElo,
-        previousElo: previous?.powerEloPost ?? previous?.powerElo,
-        talentRating: teamTalentById.get(String(row.gshlTeamId)) ?? undefined,
-      };
+    power: currentPower.flatMap((row) => {
+      // Week N stores entering ranks; its results first appear in Week N+1.
+      const next = nextPowerByTeam.get(String(row.gshlTeamId));
+      if (!next || asNumber(next.powerRk) <= 0 || asNumber(row.powerRk) <= 0)
+        return [];
+      return [
+        {
+          teamId: String(row.gshlTeamId),
+          teamName:
+            teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
+          currentRank: next.powerRk,
+          previousRank: row.powerRk,
+          currentElo: row.powerEloPost,
+          previousElo: row.powerElo,
+          talentRating: teamTalentById.get(String(row.gshlTeamId)) ?? undefined,
+        },
+      ];
     }),
     activity,
     missedStarts,

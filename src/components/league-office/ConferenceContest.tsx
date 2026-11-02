@@ -36,7 +36,7 @@ import { buildStandingsNavigationHref, cn } from "@gshl-utils";
 const cleanConferenceName = (name: string) => name.replace(" Hotel", "");
 
 const formatRecord = (record?: ConferenceContestRecord) =>
-  `${record?.wins ?? 0}-${record?.losses ?? 0}${record?.ties ? `-${record.ties}` : ""}`;
+  `${record?.wins ?? 0}-${record?.losses ?? 0}`;
 
 const conferenceTone = (conference: ConferenceContestConferenceInfo) => {
   const value = `${conference.name} ${conference.abbr ?? ""}`.toLowerCase();
