@@ -160,7 +160,7 @@ function StandingsGroupTable({
               <th className="w-[4.5rem] px-1.5 py-2.5 text-center font-semibold text-slate-700 sm:px-3 sm:py-3">
                 Record
               </th>
-              <th className="w-14 bg-slate-950 px-1.5 py-2.5 text-center font-bold text-white sm:px-3 sm:py-3">
+              <th className="w-14 px-1.5 py-2.5 text-center font-semibold sm:px-3 sm:py-3">
                 PTS
               </th>
               {[
@@ -276,7 +276,7 @@ function StandingsGroupTable({
                     <td className="px-1.5 py-2.5 text-center font-mono text-sm font-semibold tabular-nums text-slate-950 sm:px-3 sm:py-3">
                       {getStandingRecord(team, season)}
                     </td>
-                    <td className="bg-slate-950 px-1.5 py-2.5 text-center font-mono text-sm font-bold tabular-nums text-white sm:px-3 sm:py-3">
+                    <td className="px-1.5 py-2.5 text-center font-mono text-sm font-semibold tabular-nums text-slate-950 sm:px-3 sm:py-3">
                       {getStandingValue("points", team, season)}
                     </td>
                     {[
