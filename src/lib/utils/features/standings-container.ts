@@ -130,7 +130,15 @@ export function standingsMatchupSummary(
   }
   const wins = Number(stats.teamW ?? 0);
   const played = wins + Number(stats.teamL ?? 0) + Number(stats.teamT ?? 0);
-  const points = calculateStandingsPoints(stats, season);
+  const points = calculateStandingsPoints(
+    {
+      teamW: wins,
+      teamHW: Number(stats.teamHW ?? 0),
+      teamHL: Number(stats.teamHL ?? 0),
+      teamT: Number(stats.teamT ?? 0),
+    },
+    season,
+  );
   return {
     played,
     winPercentage: played > 0 ? `${((wins / played) * 100).toFixed(1)}%` : "-",
