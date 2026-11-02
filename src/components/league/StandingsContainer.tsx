@@ -157,26 +157,19 @@ function StandingsGroupTable({
                   T
                 </th>
               ) : null}
-              {!showTies
-                ? ["HW", "HL"].map((label) => (
-                    <th
-                      key={label}
-                      scope="col"
-                      className="hidden px-2 py-3 text-center font-semibold lg:table-cell"
-                    >
-                      <abbr
-                        title={
-                          label === "HW"
-                            ? "Home wins: 2 points each (included in W)"
-                            : "Home losses: 1 point each (included in L)"
-                        }
-                        className="cursor-help no-underline"
-                      >
-                        {label}
-                      </abbr>
-                    </th>
-                  ))
-                : null}
+              {!showTies ? (
+                <th
+                  scope="col"
+                  className="hidden w-16 px-2 py-3 text-center font-medium text-slate-400 lg:table-cell"
+                >
+                  <abbr
+                    title="Home record (wins–losses); included in W and L"
+                    className="cursor-help no-underline"
+                  >
+                    Home
+                  </abbr>
+                </th>
+              ) : null}
               <th className="w-14 px-1.5 py-2.5 text-center font-semibold sm:px-3 sm:py-3">
                 PTS
               </th>
@@ -298,19 +291,13 @@ function StandingsGroupTable({
                         {getStandingValue("ties", team, season)}
                       </td>
                     ) : null}
-                    {!showTies
-                      ? [
-                          team.seasonStats?.teamHW,
-                          team.seasonStats?.teamHL,
-                        ].map((value, metricIndex) => (
-                          <td
-                            key={metricIndex}
-                            className="hidden px-2 py-2 text-center font-mono text-xs tabular-nums text-slate-600 lg:table-cell"
-                          >
-                            {formatStandingsDetailStat(value)}
-                          </td>
-                        ))
-                      : null}
+                    {!showTies ? (
+                      <td className="hidden px-2 py-2 text-center font-mono text-xs tabular-nums text-slate-500 lg:table-cell">
+                        {formatStandingsDetailStat(team.seasonStats?.teamHW)}
+                        <span className="text-slate-300">–</span>
+                        {formatStandingsDetailStat(team.seasonStats?.teamHL)}
+                      </td>
+                    ) : null}
                     <td className="px-1.5 py-2.5 text-center font-mono font-bold tabular-nums text-slate-950 sm:px-3 sm:py-3">
                       {getStandingValue("points", team, season)}
                     </td>
@@ -332,7 +319,7 @@ function StandingsGroupTable({
                   {isOpen ? (
                     <tr id={detailsId}>
                       <td
-                        colSpan={(showTies ? 9 : 10) + (showConference ? 1 : 0)}
+                        colSpan={9 + (showConference ? 1 : 0)}
                         className="bg-white px-2 pb-3 pt-1 sm:px-4 sm:pb-4"
                       >
                         <StandingsTeamCard
