@@ -118,38 +118,40 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                                 <div
                                   key={side}
                                   title={team?.name ?? "Team TBD"}
-                                  className="relative flex items-center justify-between gap-2"
+                                  className="relative flex items-center"
                                 >
-                                  <span
-                                    className="w-2.5 shrink-0 text-[10px] font-medium tabular-nums text-slate-500"
-                                    aria-label={
-                                      rank && rank <= 8
-                                        ? `Power ranking ${rank}`
-                                        : undefined
-                                    }
-                                  >
-                                    {rank && rank <= 8 ? rank : null}
-                                  </span>
-                                  {team?.logoUrl ? (
-                                    <Image
-                                      src={team.logoUrl}
-                                      alt=""
-                                      width={32}
-                                      height={32}
-                                      className="h-8 w-8 shrink-0 rounded bg-white object-contain"
-                                    />
-                                  ) : (
+                                  <div className="flex items-center gap-0.5">
                                     <span
-                                      aria-hidden="true"
-                                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-500"
+                                      className="shrink-0 text-[10px] font-medium tabular-nums text-slate-500"
+                                      aria-label={
+                                        rank && rank <= 8
+                                          ? `Power ranking ${rank}`
+                                          : undefined
+                                      }
                                     >
-                                      {team?.name?.slice(0, 1) ?? "?"}
+                                      {rank && rank <= 8 ? `#${rank}` : null}
                                     </span>
-                                  )}
+                                    {team?.logoUrl ? (
+                                      <Image
+                                        src={team.logoUrl}
+                                        alt=""
+                                        width={32}
+                                        height={32}
+                                        className="h-8 w-8 shrink-0 rounded bg-white object-contain"
+                                      />
+                                    ) : (
+                                      <span
+                                        aria-hidden="true"
+                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-500"
+                                      >
+                                        {team?.name?.slice(0, 1) ?? "?"}
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="sr-only">
                                     {team?.name ?? "Team TBD"}
                                   </span>
-                                  <span className="font-oswald text-xl tabular-nums">
+                                  <span className="ml-auto font-oswald text-xl tabular-nums">
                                     {matchupPhase === "upcoming"
                                       ? "–"
                                       : (score ?? "–")}
