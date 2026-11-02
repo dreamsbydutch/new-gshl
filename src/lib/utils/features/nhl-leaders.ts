@@ -38,8 +38,8 @@ export function selectNHLLeaders(
   const direction = stat === "GA" || stat === "GAA" ? 1 : -1;
   return [...players]
     .sort((a, b) => {
-      const left = a.stats[stat];
-      const right = b.stats[stat];
+      const left = getNHLLeaderStat(a, stat);
+      const right = getNHLLeaderStat(b, stat);
       if (left === null) return right === null ? a.id - b.id : 1;
       if (right === null) return -1;
       return (
@@ -47,6 +47,27 @@ export function selectNHLLeaders(
       );
     })
     .slice(0, limit);
+}
+
+export function getNHLLeaderStat(player: NHLLeader, stat: NHLLeaderStat) {
+  return stat === "TOI"
+    ? player.stats.GP > 0
+      ? player.stats.TOI / player.stats.GP
+      : null
+    : player.stats[stat];
+}
+
+export function selectQualifiedNHLGoalies(
+  players: readonly NHLLeader[],
+  stat: NHLLeaderStat,
+  maxTeamGamesPlayed: number,
+) {
+  const minimumSeconds = maxTeamGamesPlayed * 60 * 60 * 0.15;
+  return selectNHLLeaders(
+    players.filter((player) => player.stats.TOI >= minimumSeconds),
+    stat,
+    20,
+  );
 }
 
 export function formatNHLLeaderStat(stat: NHLLeaderStat, value: number | null) {
