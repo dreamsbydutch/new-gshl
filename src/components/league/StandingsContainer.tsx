@@ -166,7 +166,7 @@ function StandingsGroupTable({
                     title="Home record (wins–losses); included in W and L"
                     className="cursor-help no-underline"
                   >
-                    Home
+                    Ties
                   </abbr>
                 </th>
               ) : null}
