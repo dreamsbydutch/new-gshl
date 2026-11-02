@@ -46,6 +46,10 @@ export function refreshPlayerDayLineupContext(
     }
     for (const row of group)
       Object.assign(row, computePlayerDayLineupFlags(row));
+    const total = (field: string) =>
+      group.reduce((sum, row) => sum + Number(row[field] || 0), 0);
+    if (total("BS") > total("GP") - total("GS") - total("MS"))
+      throw Error("Bad starts exceed played bench alternatives");
   }
   return result;
 }
