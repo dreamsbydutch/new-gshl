@@ -12,6 +12,18 @@ import {
 } from "@gshl-utils/features/nhl";
 import { useNav } from "./useNav";
 import { useSeasons } from "./useSeason";
+import {
+  nhlLeadersSchema,
+  NHL_LEADERS_REFRESH_SECONDS,
+} from "@gshl-utils/features/nhl-leaders";
+
+export function useNHLLeaders(seasonId?: number) {
+  return useNHLResource(
+    seasonId ? `/api/nhl?view=leaders&season=${seasonId}` : null,
+    nhlLeadersSchema,
+    NHL_LEADERS_REFRESH_SECONDS,
+  );
+}
 
 const cache = new Map<string, { data: unknown; checkedAt: number }>();
 

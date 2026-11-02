@@ -7,8 +7,10 @@ import {
 import {
   getNHLSchedule,
   getNHLStandings,
+  getNHLLeaders,
   nhlDateRange,
 } from "@gshl-server/nhl";
+import { NHL_LEADERS_REFRESH_SECONDS } from "@gshl-utils/features/nhl-leaders";
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -17,7 +19,7 @@ export async function GET(request: Request) {
   if (!isNHLSeasonId(seasonId)) {
     return NextResponse.json({ error: "Invalid NHL season" }, { status: 400 });
   }
-  if (view !== "standings" && view !== "schedule") {
+  if (view !== "standings" && view !== "schedule" && view !== "leaders") {
     return NextResponse.json({ error: "Invalid NHL view" }, { status: 400 });
   }
   let dates: string[] = [];
@@ -35,11 +37,15 @@ export async function GET(request: Request) {
     const data =
       view === "standings"
         ? await getNHLStandings(seasonId)
-        : await getNHLSchedule(seasonId, dates);
+        : view === "leaders"
+          ? await getNHLLeaders(seasonId)
+          : await getNHLSchedule(seasonId, dates);
     const interval =
       view === "standings"
         ? NHL_STANDINGS_REFRESH_SECONDS
-        : NHL_SCHEDULE_REFRESH_SECONDS;
+        : view === "leaders"
+          ? NHL_LEADERS_REFRESH_SECONDS
+          : NHL_SCHEDULE_REFRESH_SECONDS;
     // CDN hits avoid invoking a server function for each visitor.
     const remaining = interval - (Math.floor(Date.now() / 1000) % interval);
     return NextResponse.json(data, {

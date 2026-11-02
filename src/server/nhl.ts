@@ -7,6 +7,24 @@ import {
 import { loadNHLSchedule, loadNHLStandings, loadNHLGame } from "./nhl-data";
 import { loadNhlOrganizations } from "./nhl-organizations-data";
 import { NHL_ORGANIZATION_REFRESH_SECONDS } from "../lib/utils/features/nhl-organizations";
+import { loadNHLLeaders } from "./nhl-leaders-data";
+import { NHL_LEADERS_REFRESH_SECONDS } from "../lib/utils/features/nhl-leaders";
+
+const cachedLeaders = unstable_cache(
+  async (seasonId: number, refreshWindow: number) => {
+    void refreshWindow;
+    return loadNHLLeaders(seasonId);
+  },
+  ["nhl-season-player-leaders-v1"],
+  { revalidate: NHL_LEADERS_REFRESH_SECONDS },
+);
+
+export function getNHLLeaders(seasonId: number) {
+  return cachedLeaders(
+    seasonId,
+    Math.floor(Date.now() / (NHL_LEADERS_REFRESH_SECONDS * 1000)),
+  );
+}
 
 const cachedOrganizations = unstable_cache(
   async (seasonId: number, refreshWindow: number) => {
