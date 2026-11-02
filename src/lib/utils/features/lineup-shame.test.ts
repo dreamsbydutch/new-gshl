@@ -36,6 +36,36 @@ void test("coaching percentage uses the agreed decision denominator, with higher
   assert.equal(coachingPercentage(10, 5, 0, 6), null);
 });
 
+void test("inconsistent bad-start counts cannot produce a negative coaching percentage", () => {
+  const data = buildLineupShame({
+    seasonName: "2026-27",
+    recentDate: "2026-10-31",
+    teams: [
+      { id: "beh", name: "Ben Eagers Hands", abbr: "BEH", logoUrl: null },
+    ],
+    history: [
+      {
+        gshlTeamId: "beh",
+        date: "2026-10-30",
+        GP: 201,
+        GS: 188,
+        MS: 3,
+        BS: 11,
+      },
+    ],
+    recent: [],
+  });
+  const entry = data.entries[0]!;
+  assert.equal(entry.startDecisions, 10);
+  assert.equal(entry.badStarts, 11);
+  assert.equal(entry.coachingPercentage, null);
+  assert.equal(coachingPercentage(3, 2, 0, 2), null);
+  // Impossible native counts still remain unavailable.
+  assert.equal(coachingPercentage(10, 2, 0, 3), null);
+  assert.equal(coachingPercentage(10, 5, 6, 0), null);
+  assert.equal(coachingPercentage(201, 188, 3, 7)?.toFixed(1), "30.0");
+});
+
 void test("season rankings combine history and fresh last-night leaves without double-counting the overnight aggregate", () => {
   const history = [
     {

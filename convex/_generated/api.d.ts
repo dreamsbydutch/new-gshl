@@ -56,6 +56,8 @@ import type * as lib_teamHistoryProjection from "../lib/teamHistoryProjection.js
 import type * as lib_teamLineup from "../lib/teamLineup.js";
 import type * as lib_teamScheduleProjection from "../lib/teamScheduleProjection.js";
 import type * as lib_timestamps from "../lib/timestamps.js";
+import type * as lib_tradeProjection from "../lib/tradeProjection.js";
+import type * as lib_tradeTransaction from "../lib/tradeTransaction.js";
 import type * as lib_ufaCatalog from "../lib/ufaCatalog.js";
 import type * as lib_ufaReconciliation from "../lib/ufaReconciliation.js";
 import type * as lib_verifiedPlayerDayRemoval from "../lib/verifiedPlayerDayRemoval.js";
@@ -85,6 +87,7 @@ import type * as standings from "../standings.js";
 import type * as teamHistory from "../teamHistory.js";
 import type * as timestampMigration from "../timestampMigration.js";
 import type * as tradeBlock from "../tradeBlock.js";
+import type * as trades from "../trades.js";
 import type * as ufa from "../ufa.js";
 import type * as ufaOdds from "../ufaOdds.js";
 import type * as weeklyEditionBackfill from "../weeklyEditionBackfill.js";
@@ -150,6 +153,8 @@ declare const fullApi: ApiFromModules<{
   "lib/teamLineup": typeof lib_teamLineup;
   "lib/teamScheduleProjection": typeof lib_teamScheduleProjection;
   "lib/timestamps": typeof lib_timestamps;
+  "lib/tradeProjection": typeof lib_tradeProjection;
+  "lib/tradeTransaction": typeof lib_tradeTransaction;
   "lib/ufaCatalog": typeof lib_ufaCatalog;
   "lib/ufaReconciliation": typeof lib_ufaReconciliation;
   "lib/verifiedPlayerDayRemoval": typeof lib_verifiedPlayerDayRemoval;
@@ -179,6 +184,7 @@ declare const fullApi: ApiFromModules<{
   teamHistory: typeof teamHistory;
   timestampMigration: typeof timestampMigration;
   tradeBlock: typeof tradeBlock;
+  trades: typeof trades;
   ufa: typeof ufa;
   ufaOdds: typeof ufaOdds;
   weeklyEditionBackfill: typeof weeklyEditionBackfill;

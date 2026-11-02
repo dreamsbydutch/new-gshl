@@ -64,7 +64,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
             ref={track}
             aria-label="Weekly matchups"
             tabIndex={0}
-            className="flex snap-x snap-mandatory scroll-px-0.5 gap-4 overflow-x-auto overscroll-x-contain p-0.5 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+            className="flex snap-x snap-mandatory scroll-px-0.5 gap-4 overflow-x-auto overscroll-x-contain p-0.5 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:gap-6"
           >
             {matchupGroups.map(
               ({
@@ -77,7 +77,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                 <li
                   key={matchupWeek.id}
                   ref={isCurrentWeek ? currentWeekStart : undefined}
-                  className="w-max shrink-0"
+                  className="w-max shrink-0 border-l-2 border-slate-300 pl-4 first:border-l-0 first:pl-0 sm:pl-6"
                 >
                   <h2 className="sticky left-0 mb-2 w-max max-w-full bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Week {matchupWeek.weekNum} ·{" "}

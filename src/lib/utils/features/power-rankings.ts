@@ -212,12 +212,20 @@ export function buildPowerRankings({
           : currentRating - previousRating;
       };
       const previousRank = validRank(previousByTeam.get(team.id)?.powerRk);
+      const rating = validRating(
+        latestStat?.powerRating ?? preseasonByTeam.get(team.id)?.rating,
+      );
+      const previousRating = validRating(
+        previousByTeam.get(team.id)?.powerRating,
+      );
       return {
         team,
         rank,
-        rating: validRating(
-          latestStat?.powerRating ?? preseasonByTeam.get(team.id)?.rating,
-        ),
+        rating,
+        ratingChange:
+          rating === null || previousRating === null
+            ? null
+            : rating - previousRating,
         performance,
         elo: latestStat?.powerEloPre ?? null,
         talent,

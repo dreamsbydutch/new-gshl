@@ -7,7 +7,9 @@ import type { Id } from "../../../convex/_generated/dataModel";
 export function useLeagueActivity(seasonId?: string, take = 12) {
   const data = useQuery(
     api.frontend.activity,
-    seasonId ? { seasonId: seasonId as Id<"seasons">, take } : "skip",
+    seasonId
+      ? { seasonId: seasonId as Id<"seasons">, take, grouped: true }
+      : "skip",
   );
 
   return {

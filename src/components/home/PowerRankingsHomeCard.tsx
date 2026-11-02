@@ -48,6 +48,27 @@ function Movement({ entry }: { entry: PowerRankingPreviewEntry }) {
   return <Minus className="h-3 w-3 text-slate-300" aria-label="No movement" />;
 }
 
+function ScoreMovement({ entry }: { entry: PowerRankingPreviewEntry }) {
+  const change =
+    entry.ratingChange == null ? null : Number(entry.ratingChange.toFixed(1));
+  return (
+    <span
+      className={`w-10 text-right text-xs font-semibold ${change === null || change === 0 ? "text-slate-300" : change > 0 ? "text-emerald-600" : "text-red-600"}`}
+      aria-label={
+        change === null
+          ? "Score change unavailable"
+          : change === 0
+            ? "No score change"
+            : `Score ${change > 0 ? "up" : "down"} ${Math.abs(change).toFixed(1)}`
+      }
+    >
+      {change === null || change === 0
+        ? "—"
+        : `${change > 0 ? "+" : ""}${change.toFixed(1)}`}
+    </span>
+  );
+}
+
 function TeamMark({ entry }: { entry: PowerRankingPreviewEntry }) {
   return (
     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50">
@@ -155,11 +176,14 @@ export function PowerRankingsHomeCard({
           {previewEntries.map((entry) => (
             <li
               key={entry.team.id}
-              className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5 py-2 sm:gap-2"
+              className="grid min-w-0 grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-1.5 py-2 sm:gap-2"
             >
-              <span className="text-center text-sm font-semibold tabular-nums text-slate-950">
-                {entry.rank}
-              </span>
+              <div className="flex items-center justify-center gap-1 tabular-nums">
+                <span className="text-sm font-semibold text-slate-950">
+                  {entry.rank}
+                </span>
+                <Movement entry={entry} />
+              </div>
               <div className="flex min-w-0 items-center gap-2">
                 <span
                   className="h-4 w-1 shrink-0 rounded-full"
@@ -173,19 +197,19 @@ export function PowerRankingsHomeCard({
                   {entry.team.name ?? entry.team.abbr ?? "Team"}
                 </span>
               </div>
-              <span className="flex justify-center">
-                <Movement entry={entry} />
-              </span>
-              <span
-                aria-label={
-                  entry.rating === null
-                    ? "Rating unavailable"
-                    : `Rating ${entry.rating.toFixed(1)}`
-                }
-                className="text-right text-sm font-semibold tabular-nums text-slate-500"
-              >
-                {entry.rating === null ? "—" : entry.rating.toFixed(1)}
-              </span>
+              <div className="flex items-baseline justify-end gap-1.5 whitespace-nowrap tabular-nums">
+                <span
+                  aria-label={
+                    entry.rating === null
+                      ? "Rating unavailable"
+                      : `Rating ${entry.rating.toFixed(1)}`
+                  }
+                  className="text-right text-sm font-semibold tabular-nums text-slate-500"
+                >
+                  {entry.rating === null ? "—" : entry.rating.toFixed(1)}
+                </span>
+                <ScoreMovement entry={entry} />
+              </div>
             </li>
           ))}
         </ol>

@@ -27,6 +27,10 @@ const ContractManagement = dynamic(
     import("./ContractManagement").then((module) => module.ContractManagement),
   { loading: () => <AdminPanelSkeleton /> },
 );
+const TradeManagement = dynamic(
+  () => import("./TradeManagement").then((module) => module.TradeManagement),
+  { loading: () => <AdminPanelSkeleton /> },
+);
 const JobManagement = dynamic(
   () => import("./JobManagement").then((module) => module.JobManagement),
   { loading: () => <AdminPanelSkeleton /> },
@@ -71,6 +75,7 @@ export function AdminContent() {
     <div className="container mx-auto px-4 py-8">
       {selectedView === "accounts" ? <AccountsManagement /> : null}
       {selectedView === "contracts" ? <ContractManagement /> : null}
+      {selectedView === "trades" ? <TradeManagement /> : null}
       {selectedView === "nhlContracts" ? <NormalizedNhlContracts /> : null}
       {selectedView === "nhlRosters" ? <NormalizedNhlRosters /> : null}
       {selectedView === "draftPicks" ? <DraftPickManagement /> : null}

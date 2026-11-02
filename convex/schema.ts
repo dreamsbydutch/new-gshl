@@ -550,6 +550,56 @@ export default defineSchema({
     ],
   ),
 
+  trades: defineTable({
+    seasonId: v.id("seasons"),
+    effectiveDate: v.string(),
+    requestId: v.string(),
+    fingerprint: v.string(),
+    teamAId: v.id("teams"),
+    teamBId: v.id("teams"),
+    teamAName: v.string(),
+    teamBName: v.string(),
+    teamALogoUrl: v.union(v.string(), v.null()),
+    teamBLogoUrl: v.union(v.string(), v.null()),
+    players: v.array(
+      v.object({
+        playerId: v.id("players"),
+        playerName: v.string(),
+        fromTeamId: v.id("teams"),
+        toTeamId: v.id("teams"),
+        contractIds: v.array(v.id("contracts")),
+      }),
+    ),
+    picks: v.array(
+      v.object({
+        pickId: v.id("draftPicks"),
+        label: v.string(),
+        fromTeamId: v.id("teams"),
+        toTeamId: v.id("teams"),
+      }),
+    ),
+    contractTransfers: v.array(
+      v.object({
+        contractId: v.id("contracts"),
+        fromOwnerId: v.id("owners"),
+        toOwnerId: v.id("owners"),
+        before: v.string(),
+      }),
+    ),
+    pickChanges: v.array(
+      v.object({
+        pickId: v.id("draftPicks"),
+        before: v.string(),
+        after: v.string(),
+      }),
+    ),
+    notes: v.string(),
+    createdBy: v.id("authUsers"),
+    createdAt: v.number(),
+  })
+    .index("by_seasonId_effectiveDate", ["seasonId", "effectiveDate"])
+    .index("by_requestId", ["requestId"]),
+
   tradeBlockEntries: defineTable({
     ownerId: v.id("owners"),
     playerId: v.id("players"),
