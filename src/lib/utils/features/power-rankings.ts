@@ -104,6 +104,24 @@ const validRating = (value: unknown): number | null => {
   return Number.isFinite(rating) ? rating : null;
 };
 
+// Fixed display scales, independent of the visible teams or week. These are
+// input visualizations, not historical percentiles or changes to power math.
+const inputDisplayRating = (
+  value: unknown,
+  midpoint: number,
+  pointsPerUnit: number,
+): number | null => {
+  const rating = validRating(value);
+  return rating === null
+    ? null
+    : Math.max(0, Math.min(100, 50 + (rating - midpoint) * pointsPerUnit));
+};
+const performanceDisplayRating = (value: unknown) =>
+  inputDisplayRating(value, 0, 40);
+// Raw talent 60 -> 20, 67.5 -> 50, 75 -> 80.
+const talentDisplayRating = (value: unknown) =>
+  inputDisplayRating(value, 67.5, 4);
+
 const compareWeeks = (left: PowerRankingWeek, right: PowerRankingWeek) => {
   const dateDifference =
     new Date(left.startDate).getTime() - new Date(right.startDate).getTime();
@@ -184,6 +202,8 @@ export function buildPowerRankings({
   const entries: PowerRankingEntry[] = rankedTeams.map(
     ({ team, latestStat, rank }) => {
       const previousStat = previousByTeam.get(team.id);
+      const performance = performanceDisplayRating(latestStat?.powerStatEwma);
+      const talent = talentDisplayRating(latestStat?.powerTalent);
       const change = (current: unknown, previous: unknown) => {
         const currentRating = validRating(current);
         const previousRating = validRating(previous);
@@ -198,17 +218,20 @@ export function buildPowerRankings({
         rating: validRating(
           latestStat?.powerRating ?? preseasonByTeam.get(team.id)?.rating,
         ),
-        performance: latestStat?.powerStatEwma ?? null,
+        performance,
         elo: latestStat?.powerEloPre ?? null,
-        talent: latestStat?.powerTalent ?? null,
+        talent,
         ratingChanges: {
           rating: change(latestStat?.powerRating, previousStat?.powerRating),
           performance: change(
-            latestStat?.powerStatEwma,
-            previousStat?.powerStatEwma,
+            performance,
+            performanceDisplayRating(previousStat?.powerStatEwma),
           ),
           elo: change(latestStat?.powerEloPre, previousStat?.powerEloPre),
-          talent: change(latestStat?.powerTalent, previousStat?.powerTalent),
+          talent: change(
+            talent,
+            talentDisplayRating(previousStat?.powerTalent),
+          ),
         },
         previousRank,
         rankChange: previousRank === null ? null : previousRank - rank,

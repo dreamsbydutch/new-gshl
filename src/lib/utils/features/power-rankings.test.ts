@@ -165,13 +165,13 @@ void test("compares rating values with the prior snapshot without inventing miss
         ...weekly("a", 1, 2, 48),
         powerStatEwma: 0,
         powerEloPre: 1510,
-        powerTalent: 4,
+        powerTalent: 65,
       },
       {
         ...weekly("a", 2, 1, 55),
         powerStatEwma: 1.2,
         powerEloPre: 1500,
-        powerTalent: 4,
+        powerTalent: 65,
       },
       weekly("b", 2, 2, 45),
     ],
@@ -179,7 +179,7 @@ void test("compares rating values with the prior snapshot without inventing miss
   });
   assert.deepEqual(result.entries[0]?.ratingChanges, {
     rating: 7,
-    performance: 1.2,
+    performance: 48,
     elo: -10,
     talent: 0,
   });
@@ -207,6 +207,53 @@ void test("labels playoff snapshots for the accessible history table", () => {
 
   assert.equal(result.chartData[0]?.label, "Playoffs 3");
   assert.equal(result.chartData[0]?.a, 1);
+});
+
+void test("uses fixed bounded input scales and compares rescaled weekly ratings", () => {
+  const teams = [
+    makeTeam("a", "Alpha"),
+    makeTeam("b", "Bravo"),
+    makeTeam("c", "Charlie"),
+  ];
+  const input = {
+    teams,
+    weeks: [makeWeek(1), makeWeek(2)],
+    seasonStats: [],
+    weeklyStats: [
+      { ...weekly("a", 1, 1, 75.2), powerStatEwma: 0.8, powerTalent: 71.9 },
+      { ...weekly("a", 2, 1, 68.4), powerStatEwma: 0.5, powerTalent: 68.6 },
+      { ...weekly("b", 2, 2, 60), powerStatEwma: -2, powerTalent: 60 },
+      { ...weekly("c", 2, 3, 55), powerStatEwma: 2, powerTalent: 75 },
+    ],
+  };
+  const result = buildPowerRankings(input);
+  const first = result.entries[0]!;
+  assert.equal(first.performance, 70);
+  assert.ok(Math.abs(first.talent! - 54.4) < 1e-9);
+  assert.equal(first.ratingChanges?.performance, -12);
+  assert.ok(Math.abs(first.ratingChanges.talent! + 13.2) < 1e-9);
+  assert.equal(first.rank, 1);
+  assert.equal(first.rating, 68.4);
+  assert.equal(result.entries[1]?.performance, 0);
+  assert.equal(result.entries[1]?.talent, 20);
+  assert.equal(result.entries[2]?.performance, 100);
+  assert.equal(result.entries[2]?.talent, 80);
+  const filtered = buildPowerRankings({ ...input, teams: [teams[0]!] });
+  assert.equal(filtered.entries[0]?.performance, first.performance);
+  assert.equal(filtered.entries[0]?.talent, first.talent);
+  const extremes = buildPowerRankings({
+    ...input,
+    weeklyStats: [
+      { ...weekly("a", 2, 1, 68.4), powerStatEwma: null, powerTalent: 100 },
+      { ...weekly("b", 2, 2, 60), powerStatEwma: Number.NaN, powerTalent: -10 },
+      weekly("c", 2, 3, 55),
+    ],
+  });
+  assert.equal(extremes.entries[0]?.performance, null);
+  assert.equal(extremes.entries[0]?.talent, 100);
+  assert.equal(extremes.entries[1]?.performance, null);
+  assert.equal(extremes.entries[1]?.talent, 0);
+  assert.equal(extremes.entries[2]?.talent, null);
 });
 
 void test("selects distinct colors from each team's logo palette", () => {
@@ -245,7 +292,7 @@ void test("journey defaults to owner then leader, respects selection, and leaves
         ...weekly("a", 3, 1, 60),
         powerStatEwma: 1.2,
         powerEloPre: 1510,
-        powerTalent: 4,
+        powerTalent: 65,
       },
       weekly("b", 3, 2, 40),
     ],
@@ -258,7 +305,7 @@ void test("journey defaults to owner then leader, respects selection, and leaves
       result.entries[0]?.elo,
       result.entries[0]?.talent,
     ],
-    [1.2, 1510, 4],
+    [98, 1510, 40],
   );
   assert.equal(
     buildPowerRankingJourney(result, "owner-b").focused?.team.id,
