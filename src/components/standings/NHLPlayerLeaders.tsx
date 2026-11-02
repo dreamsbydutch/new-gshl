@@ -1,7 +1,10 @@
 "use client";
 
 import { useNHLLeadersData } from "@gshl-hooks/features/useNHLLeadersData";
-import { formatNHLLeaderStat } from "@gshl-utils/features/nhl-leaders";
+import {
+  formatNHLLeaderStat,
+  getNHLLeaderStat,
+} from "@gshl-utils/features/nhl-leaders";
 import type { NHLLeader, NHLLeaderStat } from "@gshl-lib/types/nhl-leaders";
 
 const SKATER_STATS: NHLLeaderStat[] = [
@@ -34,7 +37,7 @@ const STAT_NAMES: Record<NHLLeaderStat, string> = {
   PPP: "Power-play points",
   HIT: "Hits",
   BLK: "Blocked shots",
-  TOI: "Total time on ice (minutes:seconds)",
+  TOI: "Time on ice per game (minutes:seconds)",
   W: "Wins",
   GA: "Goals against",
   GAA: "Goals-against average",
@@ -67,8 +70,8 @@ function LeaderTable({
         <table className="w-full whitespace-nowrap text-right text-xs tabular-nums">
           <caption className="sr-only">
             {title}. Click a stat to show its season leaders. GA and GAA rank
-            lowest first; other stats rank highest first. TOI is total season
-            time.
+            lowest first; other stats rank highest first. TOI/G is average time
+            on ice per game.
           </caption>
           <thead className="text-gray-500">
             <tr>
@@ -100,7 +103,7 @@ function LeaderTable({
                     aria-label={`Sort by ${STAT_NAMES[stat]}`}
                     className={`px-2 py-3 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 ${sort === stat ? "font-bold text-gray-950 underline" : ""}`}
                   >
-                    {stat}
+                    {stat === "TOI" ? "TOI/G" : stat}
                     {sort === stat
                       ? stat === "GA" || stat === "GAA"
                         ? " ↑"
@@ -126,7 +129,7 @@ function LeaderTable({
                     key={stat}
                     className={`px-2 py-2 ${sort === stat ? "font-bold text-gray-950" : ""}`}
                   >
-                    {formatNHLLeaderStat(stat, player.stats[stat])}
+                    {formatNHLLeaderStat(stat, getNHLLeaderStat(player, stat))}
                   </td>
                 ))}
               </tr>
@@ -153,7 +156,13 @@ function LeaderTable({
   );
 }
 
-export function NHLPlayerLeaders({ seasonId }: { seasonId?: number }) {
+export function NHLPlayerLeaders({
+  seasonId,
+  maxTeamGamesPlayed,
+}: {
+  seasonId?: number;
+  maxTeamGamesPlayed: number;
+}) {
   const {
     skaters,
     goalies,
@@ -164,7 +173,7 @@ export function NHLPlayerLeaders({ seasonId }: { seasonId?: number }) {
     isLoading,
     error,
     retry,
-  } = useNHLLeadersData(seasonId);
+  } = useNHLLeadersData(seasonId, maxTeamGamesPlayed);
   return (
     <section aria-labelledby="nhl-leaders-heading" className="space-y-3">
       <div>
@@ -172,8 +181,9 @@ export function NHLPlayerLeaders({ seasonId }: { seasonId?: number }) {
           NHL player leaders
         </h2>
         <p className="text-xs text-gray-500">
-          Regular season · Select a stat to see its top players. TOI shows total
-          season minutes.
+          Regular season · Select a stat to see its top players. TOI/G shows
+          average ice time per game. Goalies need at least 15% of the highest
+          team GP times 60 minutes in total ice time.
         </p>
       </div>
       {error && (

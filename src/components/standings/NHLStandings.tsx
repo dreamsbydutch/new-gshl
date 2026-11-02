@@ -41,7 +41,7 @@ export function NHLStandings() {
           NHL standings are not available yet.
         </p>
       )}
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="mx-auto grid w-fit max-w-full items-start gap-6 lg:grid-cols-2">
         {divisions.map((division) => {
           const teams = data!.standings
             .filter((team) => team.divisionName === division)
@@ -138,7 +138,13 @@ export function NHLStandings() {
           );
         })}
       </div>
-      <NHLPlayerLeaders seasonId={seasonId} />
+      <NHLPlayerLeaders
+        seasonId={seasonId}
+        maxTeamGamesPlayed={Math.max(
+          0,
+          ...(data?.standings.map((team) => team.gamesPlayed) ?? []),
+        )}
+      />
     </div>
   );
 }
