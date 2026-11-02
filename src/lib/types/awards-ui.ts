@@ -72,7 +72,14 @@ export interface SeasonAwardsProps {
 export interface AwardRaceCard {
   id: string;
   title: string;
-  contenders: { id: string; name: string; logoUrl: string | null }[];
+  imageUrl: string | null;
+  ranked: boolean;
+  contenders: {
+    id: string;
+    name: string;
+    logoUrl: string | null;
+    stat?: string;
+  }[];
 }
 
 export interface AwardsShowcaseProps {

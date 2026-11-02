@@ -1,10 +1,16 @@
-import { AWARD_CATALOG, getAwardLabel } from "@gshl-lib/config/awards";
+import {
+  AWARD_CATALOG,
+  AWARD_CATALOG_BY_KEY,
+  PLAYER_TROPHY_ICON_AWARDS,
+  PLAYER_TROPHY_ICON_URLS,
+  getAwardLabel,
+} from "@gshl-lib/config/awards";
 import type {
   AwardRaceCard,
   SeasonAwardsProps,
   TeamSeasonStatLine,
 } from "@gshl-types";
-import { getOwnerDisplayName } from "./season-awards";
+import { formatStandingsRecord } from "../domain/season";
 
 const rankFields: Record<string, keyof TeamSeasonStatLine> = {
   hart: "hartRk",
@@ -22,7 +28,15 @@ const number = (value: unknown): number | null =>
     ? null
     : Number(value);
 
-/** Select by award merit, then alphabetize so display order never reveals the leader. */
+// A stable shuffle avoids revealing rank without moving names on every render.
+function displayOrder(id: string): number {
+  let hash = 2166136261;
+  for (const character of id)
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  return hash >>> 0;
+}
+
+/** Public stats stay ordered; rated award finalists conceal both order and scores. */
 export function buildAwardRaces({
   season,
   teams,
@@ -38,18 +52,40 @@ export function buildAwardRaces({
       logoUrl: string | null;
       value: number;
       tie: number;
+      stat?: string;
     }[],
-  ) =>
-    [...entries]
+    ranked: boolean,
+    key: string,
+  ) => {
+    const finalists = [...entries]
       .sort(
         (a, b) =>
           b.value - a.value || b.tie - a.tie || a.id.localeCompare(b.id),
       )
-      .slice(0, 5)
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(({ id, name, logoUrl }) => ({ id, name, logoUrl }));
+      .slice(0, 4);
+    if (!ranked)
+      finalists.sort(
+        (a, b) =>
+          displayOrder(`${key}:${a.id}`) - displayOrder(`${key}:${b.id}`) ||
+          a.id.localeCompare(b.id),
+      );
+    return finalists.map(({ id, name, logoUrl, stat }) => ({
+      id,
+      name,
+      logoUrl,
+      ...(ranked ? { stat } : {}),
+    }));
+  };
   const teamCards = AWARD_CATALOG.filter((c) => c.key !== "gshlCup").map(
     (c) => {
+      const ranked = [
+        "president",
+        "sunview",
+        "hickory",
+        "brophy",
+        "rocket",
+        "artRoss",
+      ].includes(c.key);
       const contenders = teamStats
         .filter((r) => r.seasonId === season.id && r.seasonType === "RS")
         .flatMap((row) => {
@@ -90,22 +126,25 @@ export function buildAwardRaces({
           return [
             {
               id: team.id,
-              name: ["gmoy", "jackAdams"].includes(c.key)
-                ? (getOwnerDisplayName(team) ??
-                  team.name ??
-                  team.abbr ??
-                  "GSHL")
-                : (team.name ?? team.abbr ?? "GSHL"),
+              name: team.name ?? team.abbr ?? "GSHL",
               logoUrl: team.logoUrl ?? null,
               value,
               tie: -(number(row.overallRk) ?? Infinity),
+              stat:
+                c.key === "rocket"
+                  ? `${Number(row.G)} G`
+                  : c.key === "artRoss"
+                    ? `${Number(row.P)} P`
+                    : formatStandingsRecord(row, season),
             },
           ];
         });
       return {
         id: `team-${c.key}`,
         title: c.fullName,
-        contenders: finish(contenders),
+        imageUrl: c.imageUrl,
+        ranked,
+        contenders: finish(contenders, ranked, c.key),
       };
     },
   );
@@ -119,6 +158,7 @@ export function buildAwardRaces({
       "connSmythe",
     ] as const
   ).map((key) => {
+    const ranked = key === "gretzky" || key === "ovechkin";
     const contenders = playerTotals
       .filter(
         (r) =>
@@ -149,13 +189,20 @@ export function buildAwardRaces({
             logoUrl: team?.logoUrl ?? null,
             value,
             tie: number(row.Rating) ?? -Infinity,
+            stat: `${value} ${key === "ovechkin" ? "G" : "P"}`,
           },
         ];
       });
     return {
       id: `player-${key}`,
       title: getAwardLabel(key),
-      contenders: finish(contenders),
+      imageUrl:
+        PLAYER_TROPHY_ICON_URLS.get(key) ??
+        AWARD_CATALOG_BY_KEY.get(PLAYER_TROPHY_ICON_AWARDS.get(key) ?? key)
+          ?.imageUrl ??
+        null,
+      ranked,
+      contenders: finish(contenders, ranked, key),
     };
   });
   return [...teamCards, ...playerCards].filter((c) => c.contenders.length > 0);
