@@ -80,6 +80,18 @@ function getStandingValue(
   return formatStandingsDetailStat(calculateStandingsPoints(stats, season));
 }
 
+function getStandingRecord(team: StandingsTeamRow, season: Season): string {
+  const wins = getStandingValue("wins", team, season);
+  const losses = getStandingValue("losses", team, season);
+
+  if (wins === "-" || losses === "-") return "–";
+
+  const ties = season.usesLegacyTies
+    ? `–${getStandingValue("ties", team, season)}`
+    : "";
+  return `${wins}–${losses}${ties}`;
+}
+
 function getGroupDescription(standingsType: string, groupTitle: string) {
   if (standingsType === "wildcard") {
     if (groupTitle === "Wildcard") return "Two best remaining teams";
@@ -105,7 +117,6 @@ function StandingsGroupTable({
     ? (group.teams.find((team) => team.confLogoUrl)?.confLogoUrl ?? null)
     : GSHL_LEAGUE_LOGO_URL;
   const purpose = getGroupDescription(standingsType, group.title);
-  const showTies = season.usesLegacyTies;
   const showConference = standingsType === "overall";
 
   return (
@@ -146,31 +157,10 @@ function StandingsGroupTable({
                   Conf
                 </th>
               ) : null}
-              <th className="w-11 px-1.5 py-2.5 text-center font-semibold sm:px-3 sm:py-3">
-                W
+              <th className="w-[4.5rem] px-1.5 py-2.5 text-center font-semibold text-slate-700 sm:px-3 sm:py-3">
+                Record
               </th>
-              <th className="w-11 px-1.5 py-2.5 text-center font-semibold sm:px-3 sm:py-3">
-                L
-              </th>
-              {showTies ? (
-                <th className="w-11 px-1.5 py-2.5 text-center font-semibold sm:px-3 sm:py-3">
-                  T
-                </th>
-              ) : null}
-              {!showTies ? (
-                <th
-                  scope="col"
-                  className="hidden w-16 px-2 py-3 text-center font-medium text-slate-400 lg:table-cell"
-                >
-                  <abbr
-                    title="Home record (wins–losses); included in W and L"
-                    className="cursor-help no-underline"
-                  >
-                    Ties
-                  </abbr>
-                </th>
-              ) : null}
-              <th className="w-14 px-1.5 py-2.5 text-center font-semibold sm:px-3 sm:py-3">
+              <th className="w-14 bg-slate-950 px-1.5 py-2.5 text-center font-bold text-white sm:px-3 sm:py-3">
                 PTS
               </th>
               {[
@@ -283,25 +273,10 @@ function StandingsGroupTable({
                         </span>
                       </td>
                     ) : null}
-                    <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
-                      {getStandingValue("wins", team, season)}
+                    <td className="px-1.5 py-2.5 text-center font-mono text-sm font-semibold tabular-nums text-slate-950 sm:px-3 sm:py-3">
+                      {getStandingRecord(team, season)}
                     </td>
-                    <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
-                      {getStandingValue("losses", team, season)}
-                    </td>
-                    {showTies ? (
-                      <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
-                        {getStandingValue("ties", team, season)}
-                      </td>
-                    ) : null}
-                    {!showTies ? (
-                      <td className="hidden px-2 py-2 text-center font-mono text-xs tabular-nums text-slate-500 lg:table-cell">
-                        {formatStandingsDetailStat(team.seasonStats?.teamHW)}
-                        <span className="text-slate-300">–</span>
-                        {formatStandingsDetailStat(team.seasonStats?.teamHL)}
-                      </td>
-                    ) : null}
-                    <td className="px-1.5 py-2.5 text-center font-mono font-bold tabular-nums text-slate-950 sm:px-3 sm:py-3">
+                    <td className="bg-slate-950 px-1.5 py-2.5 text-center font-mono text-sm font-bold tabular-nums text-white sm:px-3 sm:py-3">
                       {getStandingValue("points", team, season)}
                     </td>
                     {[
@@ -322,7 +297,7 @@ function StandingsGroupTable({
                   {isOpen ? (
                     <tr id={detailsId}>
                       <td
-                        colSpan={9 + (showConference ? 1 : 0)}
+                        colSpan={7 + (showConference ? 1 : 0)}
                         className="bg-white px-2 pb-3 pt-1 sm:px-4 sm:pb-4"
                       >
                         <StandingsTeamCard

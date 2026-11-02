@@ -66,7 +66,7 @@ export function NHLStandings() {
                     <th scope="col" className="px-3 py-2 text-left">
                       Team
                     </th>
-                    {["GP", "W", "L", "OT", "PTS", "+/−"].map((label) => (
+                    {["GP", "Record", "PTS", "+/−"].map((label) => (
                       <th scope="col" className="px-2 py-2" key={label}>
                         {label}
                       </th>
@@ -107,10 +107,12 @@ export function NHLStandings() {
                         </span>
                       </th>
                       <td className="px-2">{team.gamesPlayed}</td>
-                      <td className="px-2">{team.wins}</td>
-                      <td className="px-2">{team.losses}</td>
-                      <td className="px-2">{team.otLosses}</td>
-                      <td className="px-2 font-bold">{team.points}</td>
+                      <td className="px-2 font-semibold text-gray-950">
+                        {team.wins}–{team.losses}–{team.otLosses}
+                      </td>
+                      <td className="bg-slate-950 px-2 font-bold text-white">
+                        {team.points}
+                      </td>
                       <td className="px-2">
                         {team.goalDifferential > 0 ? "+" : ""}
                         {team.goalDifferential}
