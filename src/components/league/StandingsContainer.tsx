@@ -360,7 +360,7 @@ export function StandingsTable({
   });
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-3 px-2.5 py-3 sm:px-6 sm:py-4">
+    <div className="mx-auto w-full max-w-screen-2xl space-y-3 px-2.5 py-3 sm:px-6 sm:py-4">
       <div className="border-b border-slate-300 pb-2">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[13px] font-semibold uppercase text-slate-500">
@@ -380,14 +380,30 @@ export function StandingsTable({
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div
+        className={cn(
+          "grid grid-cols-1 items-start gap-3",
+          (standingsType === "conference" || standingsType === "wildcard") &&
+            "lg:grid-cols-2",
+        )}
+      >
         {groups.map((group) => (
-          <StandingsGroupTable
+          <div
             key={group.title}
-            group={group}
-            season={selectedSeason}
-            standingsType={standingsType}
-          />
+            className={cn(
+              "min-w-0",
+              standingsType === "wildcard" &&
+                (group.title === "Wildcard" ||
+                  group.title === "Out of the Playoffs") &&
+                "lg:col-span-2",
+            )}
+          >
+            <StandingsGroupTable
+              group={group}
+              season={selectedSeason}
+              standingsType={standingsType}
+            />
+          </div>
         ))}
       </div>
     </div>
