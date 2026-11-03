@@ -1,5 +1,6 @@
 "use client";
 
+import { usePowerRankingsPreview } from "@gshl-hooks/main/usePowerRankings";
 import { useMatchupRecords } from "@gshl-hooks/main/useMatchupRecords";
 import type { MatchupRecords } from "@gshl-lib/types/performance-records";
 import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
@@ -68,6 +69,11 @@ function CategoryResultsCard({
   details: MatchupDetailsPayload;
 }) {
   const activity = useMatchupActivity(details);
+  const { data: powerRankings } = usePowerRankingsPreview(
+    details.matchup.seasonId,
+    8,
+    details.matchup.weekId,
+  );
   const awayLabel = awayTeam?.abbr ?? awayTeam?.name ?? "Away";
   const homeLabel = homeTeam?.abbr ?? homeTeam?.name ?? "Home";
   const outcomeFor = (
@@ -116,19 +122,32 @@ function CategoryResultsCard({
                 }
                 const team = side === "away" ? awayTeam : homeTeam;
                 const label = side === "away" ? awayLabel : homeLabel;
+                const rank = powerRankings?.entries.find(
+                  (entry) => entry.team.id === team?.id,
+                )?.rank;
                 return (
                   <th key={side} scope="col" className="px-2 py-2 text-center">
                     <div
                       className={`flex min-h-[69px] min-w-0 items-center justify-center gap-1.5 sm:min-h-[79px] sm:gap-2 ${side === "home" ? "flex-row-reverse" : ""}`}
                     >
                       {team?.logoUrl ? (
-                        <Image
-                          src={team.logoUrl}
-                          alt=""
-                          width={64}
-                          height={64}
-                          className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16"
-                        />
+                        <div className="relative shrink-0">
+                          {rank && rank <= 8 ? (
+                            <span
+                              className="absolute -left-1 top-0 -translate-x-full text-[10px] font-medium tabular-nums text-slate-500"
+                              aria-label={`Power ranking ${rank}`}
+                            >
+                              #{rank}
+                            </span>
+                          ) : null}
+                          <Image
+                            src={team.logoUrl}
+                            alt=""
+                            width={64}
+                            height={64}
+                            className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16"
+                          />
+                        </div>
                       ) : null}
                       <div className="min-w-0">
                         <div
@@ -568,7 +587,7 @@ export function MatchupDetailsContent({
         <Link
           href={matchupNavigation.backHref}
           aria-label={matchupNavigation.backLabel}
-          className="inline-flex shrink-0 min-h-11 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 lg:text-sm"
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 lg:text-sm"
         >
           <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
           <span className="hidden lg:inline">
