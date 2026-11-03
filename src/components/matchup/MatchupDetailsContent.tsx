@@ -1,5 +1,6 @@
 "use client";
 
+import { MatchupRankBadge, MatchupRanksContext } from "./MatchupRankBadge";
 import { usePowerRankingsPreview } from "@gshl-hooks/main/usePowerRankings";
 import { useMatchupRecords } from "@gshl-hooks/main/useMatchupRecords";
 import type { MatchupRecords } from "@gshl-lib/types/performance-records";
@@ -69,11 +70,7 @@ function CategoryResultsCard({
   details: MatchupDetailsPayload;
 }) {
   const activity = useMatchupActivity(details);
-  const { data: powerRankings } = usePowerRankingsPreview(
-    details.matchup.seasonId,
-    8,
-    details.matchup.weekId,
-  );
+
   const awayLabel = awayTeam?.abbr ?? awayTeam?.name ?? "Away";
   const homeLabel = homeTeam?.abbr ?? homeTeam?.name ?? "Home";
   const outcomeFor = (
@@ -122,24 +119,13 @@ function CategoryResultsCard({
                 }
                 const team = side === "away" ? awayTeam : homeTeam;
                 const label = side === "away" ? awayLabel : homeLabel;
-                const rank = powerRankings?.entries.find(
-                  (entry) => entry.team.id === team?.id,
-                )?.rank;
                 return (
                   <th key={side} scope="col" className="px-2 py-2 text-center">
                     <div
                       className={`flex min-h-[69px] min-w-0 items-center justify-center gap-1.5 sm:min-h-[79px] sm:gap-2 ${side === "home" ? "flex-row-reverse" : ""}`}
                     >
                       {team?.logoUrl ? (
-                        <div className="relative shrink-0">
-                          {rank && rank <= 8 ? (
-                            <span
-                              className="absolute -left-1 top-0 -translate-x-full text-[10px] font-medium tabular-nums text-slate-500"
-                              aria-label={`Power ranking ${rank}`}
-                            >
-                              #{rank}
-                            </span>
-                          ) : null}
+                        <MatchupRankBadge teamId={team.id}>
                           <Image
                             src={team.logoUrl}
                             alt=""
@@ -147,7 +133,7 @@ function CategoryResultsCard({
                             height={64}
                             className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16"
                           />
-                        </div>
+                        </MatchupRankBadge>
                       ) : null}
                       <div className="min-w-0">
                         <div
@@ -437,6 +423,7 @@ export function MatchupDetailsContent({
   const details = matchupQuery.data;
   const matchup = details?.matchup ?? null;
   const season = details?.season ?? null;
+  const { data: powerRankings } = usePowerRankingsPreview(matchup?.seasonId, 8, matchup?.weekId);
   const week = details?.week ?? null;
   const records = useMatchupRecords(matchupId, week?.startDate, week?.endDate);
   const isComplete = isMatchupDetailsComplete(matchup, week);
@@ -576,170 +563,181 @@ export function MatchupDetailsContent({
   }
 
   return (
-    <main
-      aria-labelledby="matchup-page-heading"
-      className="mx-auto max-w-6xl px-2 py-3 sm:px-4 sm:py-5"
+    <MatchupRanksContext.Provider
+      value={
+        new Map(
+          powerRankings?.entries.map((entry) => [entry.team.id, entry.rank]),
+        )
+      }
     >
-      <h1 id="matchup-page-heading" className="sr-only">
-        {awayTeam?.name ?? "Away team"} at {homeTeam?.name ?? "Home team"}
-      </h1>
-      <div className="mb-3 flex items-center justify-between gap-2 sm:mb-6">
-        <Link
-          href={matchupNavigation.backHref}
-          aria-label={matchupNavigation.backLabel}
-          className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 lg:text-sm"
-        >
-          <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
-          <span className="hidden lg:inline">
-            {matchupNavigation.backLabel}
-          </span>
-        </Link>
-        <WeekMatchupScroller
-          seasonId={matchup.seasonId}
-          weekId={matchup.weekId}
-          matchupId={matchupId}
-        />
-        {canShareOwnerContent(session?.user.role) ? (
-          <WhatsAppShareButton
-            message={matchupShareMessage}
-            path={`/matchup/${encodeURIComponent(matchupId)}`}
-            label=""
-            ariaLabel="Share matchup to WhatsApp"
-            className="h-11 w-11 shrink-0 !px-0"
-          />
-        ) : null}
-      </div>
-
-      {details ? (
-        <MatchupSummaryLayout
-          details={details}
-          categoryPanel={
-            <div className="space-y-2 sm:space-y-4">
-              <CategoryResultsCard
-                records={records}
-                details={details}
-                title="Matchup Breakdown"
-                scores={matchupScore}
-                status={matchupStatus}
-                updatedAt={latestMatchupStatsUpdatedAt(
-                  details.teamStatsUpdatedAt,
-                )}
-                categories={categoryResults}
-                homeTeam={homeTeam}
-                awayTeam={awayTeam}
-              />
-              {isComplete ? <StarsCard stars={stars} /> : null}
-            </div>
-          }
-        />
-      ) : (
-        <div className="space-y-2 sm:space-y-4">
-          {isComplete ? <StarsCard stars={stars} /> : null}
-        </div>
-      )}
-
-      <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div
-            role="tablist"
-            aria-label="Select a team for player statistics"
-            className="grid grid-cols-2"
+      <main
+        aria-labelledby="matchup-page-heading"
+        className="mx-auto max-w-6xl px-2 py-3 sm:px-4 sm:py-5"
+      >
+        <h1 id="matchup-page-heading" className="sr-only">
+          {awayTeam?.name ?? "Away team"} at {homeTeam?.name ?? "Home team"}
+        </h1>
+        <div className="mb-3 flex items-center justify-between gap-2 sm:mb-6">
+          <Link
+            href={matchupNavigation.backHref}
+            aria-label={matchupNavigation.backLabel}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 lg:text-sm"
           >
-            {[
-              { side: "away" as const, team: awayTeam, label: "Away Team" },
-              { side: "home" as const, team: homeTeam, label: "Home Team" },
-            ].map(({ side, team, label }) => {
-              const isSelected = selectedSide === side;
-              const teamColor = side === "away" ? awayTeamColor : homeTeamColor;
-              const base = teamColor ? lighten(teamColor, 0.82) : "#f8fafc";
-              const textColor = readableText(base);
-              const accent = teamColor ?? "#cbd5e1";
-
-              return (
-                <button
-                  key={side}
-                  id={`matchup-${side}-players-tab`}
-                  type="button"
-                  role="tab"
-                  aria-controls="matchup-player-statistics-panel"
-                  aria-selected={isSelected}
-                  tabIndex={isSelected ? 0 : -1}
-                  onClick={() => matchupNavigation.selectSide(side)}
-                  onKeyDown={(event) => {
-                    const nextSide =
-                      event.key === "ArrowLeft" || event.key === "Home"
-                        ? "away"
-                        : event.key === "ArrowRight" || event.key === "End"
-                          ? "home"
-                          : null;
-                    if (!nextSide) return;
-                    event.preventDefault();
-                    matchupNavigation.selectSide(nextSide);
-                    document
-                      .getElementById(`matchup-${nextSide}-players-tab`)
-                      ?.focus({ preventScroll: true });
-                  }}
-                  className={[
-                    "relative flex min-h-12 min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-left transition-all sm:min-h-24 sm:gap-4 sm:px-4 sm:py-5",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400",
-                    side === "away" ? "border-r border-slate-200" : "",
-                  ].join(" ")}
-                  style={{
-                    backgroundColor: base,
-                    color: textColor,
-                    borderColor: accent,
-                    opacity: isSelected ? 1 : 0.68,
-                    transform: isSelected ? "translateY(-1px)" : "none",
-                    boxShadow: isSelected
-                      ? `inset 0 0 0 3px ${accent}, 0 12px 24px -18px ${accent}`
-                      : `inset 0 0 0 1px ${accent}33`,
-                  }}
-                >
-                  {team?.logoUrl ? (
-                    <Image
-                      src={team.logoUrl}
-                      alt={team.name ?? label}
-                      width={48}
-                      height={48}
-                      className="h-7 w-7 shrink-0 object-contain sm:h-12 sm:w-12"
-                      style={{
-                        filter: isSelected ? "none" : "grayscale(0.15)",
-                      }}
-                    />
-                  ) : (
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold sm:h-12 sm:w-12 sm:text-sm">
-                      {team?.abbr?.slice(0, 3) ?? "?"}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <div className="truncate font-oswald text-sm leading-none sm:text-2xl">
-                      {team?.name ?? label}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div
-          id="matchup-player-statistics-panel"
-          role="tabpanel"
-          aria-labelledby={`matchup-${selectedSide}-players-tab`}
-        >
-          <PlayerStatsTable
-            matchup={matchup}
-            week={week}
-            records={records}
-            team={selectedTeam}
-            nhlTeams={details?.nhlTeams ?? []}
-            players={selectedPlayers}
-            playerDays={details?.playerDays?.[selectedSide] ?? []}
-            currentRoster={details?.currentRosters?.[selectedSide]}
-            seasonCategories={season?.categories}
+            <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
+            <span className="hidden lg:inline">
+              {matchupNavigation.backLabel}
+            </span>
+          </Link>
+          <WeekMatchupScroller
+            seasonId={matchup.seasonId}
+            weekId={matchup.weekId}
+            matchupId={matchupId}
           />
+          {canShareOwnerContent(session?.user.role) ? (
+            <WhatsAppShareButton
+              message={matchupShareMessage}
+              path={`/matchup/${encodeURIComponent(matchupId)}`}
+              label=""
+              ariaLabel="Share matchup to WhatsApp"
+              className="h-11 w-11 shrink-0 !px-0"
+            />
+          ) : null}
         </div>
-      </section>
-    </main>
+
+        {details ? (
+          <MatchupSummaryLayout
+            details={details}
+            categoryPanel={
+              <div className="space-y-2 sm:space-y-4">
+                <CategoryResultsCard
+                  records={records}
+                  details={details}
+                  title="Matchup Breakdown"
+                  scores={matchupScore}
+                  status={matchupStatus}
+                  updatedAt={latestMatchupStatsUpdatedAt(
+                    details.teamStatsUpdatedAt,
+                  )}
+                  categories={categoryResults}
+                  homeTeam={homeTeam}
+                  awayTeam={awayTeam}
+                />
+                {isComplete ? <StarsCard stars={stars} /> : null}
+              </div>
+            }
+          />
+        ) : (
+          <div className="space-y-2 sm:space-y-4">
+            {isComplete ? <StarsCard stars={stars} /> : null}
+          </div>
+        )}
+
+        <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div
+              role="tablist"
+              aria-label="Select a team for player statistics"
+              className="grid grid-cols-2"
+            >
+              {[
+                { side: "away" as const, team: awayTeam, label: "Away Team" },
+                { side: "home" as const, team: homeTeam, label: "Home Team" },
+              ].map(({ side, team, label }) => {
+                const isSelected = selectedSide === side;
+                const teamColor =
+                  side === "away" ? awayTeamColor : homeTeamColor;
+                const base = teamColor ? lighten(teamColor, 0.82) : "#f8fafc";
+                const textColor = readableText(base);
+                const accent = teamColor ?? "#cbd5e1";
+
+                return (
+                  <button
+                    key={side}
+                    id={`matchup-${side}-players-tab`}
+                    type="button"
+                    role="tab"
+                    aria-controls="matchup-player-statistics-panel"
+                    aria-selected={isSelected}
+                    tabIndex={isSelected ? 0 : -1}
+                    onClick={() => matchupNavigation.selectSide(side)}
+                    onKeyDown={(event) => {
+                      const nextSide =
+                        event.key === "ArrowLeft" || event.key === "Home"
+                          ? "away"
+                          : event.key === "ArrowRight" || event.key === "End"
+                            ? "home"
+                            : null;
+                      if (!nextSide) return;
+                      event.preventDefault();
+                      matchupNavigation.selectSide(nextSide);
+                      document
+                        .getElementById(`matchup-${nextSide}-players-tab`)
+                        ?.focus({ preventScroll: true });
+                    }}
+                    className={[
+                      "relative flex min-h-12 min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-left transition-all sm:min-h-24 sm:gap-4 sm:px-4 sm:py-5",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400",
+                      side === "away" ? "border-r border-slate-200" : "",
+                    ].join(" ")}
+                    style={{
+                      backgroundColor: base,
+                      color: textColor,
+                      borderColor: accent,
+                      opacity: isSelected ? 1 : 0.68,
+                      transform: isSelected ? "translateY(-1px)" : "none",
+                      boxShadow: isSelected
+                        ? `inset 0 0 0 3px ${accent}, 0 12px 24px -18px ${accent}`
+                        : `inset 0 0 0 1px ${accent}33`,
+                    }}
+                  >
+                    {team?.logoUrl ? (
+                      <MatchupRankBadge teamId={team.id}>
+                        <Image
+                          src={team.logoUrl}
+                          alt={team.name ?? label}
+                          width={48}
+                          height={48}
+                          className="h-7 w-7 shrink-0 object-contain sm:h-12 sm:w-12"
+                          style={{
+                            filter: isSelected ? "none" : "grayscale(0.15)",
+                          }}
+                        />
+                      </MatchupRankBadge>
+                    ) : (
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold sm:h-12 sm:w-12 sm:text-sm">
+                        {team?.abbr?.slice(0, 3) ?? "?"}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="truncate font-oswald text-sm leading-none sm:text-2xl">
+                        {team?.name ?? label}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div
+            id="matchup-player-statistics-panel"
+            role="tabpanel"
+            aria-labelledby={`matchup-${selectedSide}-players-tab`}
+          >
+            <PlayerStatsTable
+              matchup={matchup}
+              week={week}
+              records={records}
+              team={selectedTeam}
+              nhlTeams={details?.nhlTeams ?? []}
+              players={selectedPlayers}
+              playerDays={details?.playerDays?.[selectedSide] ?? []}
+              currentRoster={details?.currentRosters?.[selectedSide]}
+              seasonCategories={season?.categories}
+            />
+          </div>
+        </section>
+      </main>
+    </MatchupRanksContext.Provider>
   );
 }

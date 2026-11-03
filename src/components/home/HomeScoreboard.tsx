@@ -1,4 +1,5 @@
 "use client";
+import { MatchupRankBadge } from "@gshl-components/matchup/MatchupRankBadge";
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
@@ -120,32 +121,24 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                                   className="relative flex items-center"
                                 >
                                   <div className="flex items-center gap-0.5">
-                                    <span
-                                      className="shrink-0 text-[10px] font-medium tabular-nums text-slate-500"
-                                      aria-label={
-                                        rank && rank <= 8
-                                          ? `Power ranking ${rank}`
-                                          : undefined
-                                      }
-                                    >
-                                      {rank && rank <= 8 ? `#${rank}` : null}
-                                    </span>
-                                    {team?.logoUrl ? (
-                                      <Image
-                                        src={team.logoUrl}
-                                        alt=""
-                                        width={32}
-                                        height={32}
-                                        className="h-8 w-8 shrink-0 rounded bg-white object-contain"
-                                      />
-                                    ) : (
-                                      <span
-                                        aria-hidden="true"
-                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-500"
-                                      >
-                                        {team?.name?.slice(0, 1) ?? "?"}
-                                      </span>
-                                    )}
+                                    <MatchupRankBadge rank={rank}>
+                                      {team?.logoUrl ? (
+                                        <Image
+                                          src={team.logoUrl}
+                                          alt=""
+                                          width={32}
+                                          height={32}
+                                          className="h-8 w-8 shrink-0 rounded bg-white object-contain"
+                                        />
+                                      ) : (
+                                        <span
+                                          aria-hidden="true"
+                                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-500"
+                                        >
+                                          {team?.name?.slice(0, 1) ?? "?"}
+                                        </span>
+                                      )}
+                                    </MatchupRankBadge>
                                   </div>
                                   <span className="sr-only">
                                     {team?.name ?? "Team TBD"}

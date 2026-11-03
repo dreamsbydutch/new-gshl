@@ -34,6 +34,7 @@ import {
   getPlayerNhlAbbreviations,
   renderPlayerStatCell,
 } from "@gshl-utils";
+import { MatchupRankBadge } from "./MatchupRankBadge";
 import Image from "next/image";
 import Link from "next/link";
 import { Fragment } from "react";
@@ -170,13 +171,15 @@ export function PlayerStatsTable({
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 sm:px-4 sm:py-4">
         <div className="flex min-w-0 items-center gap-3">
           {team?.logoUrl ? (
-            <Image
-              src={team.logoUrl}
-              alt=""
-              width={36}
-              height={36}
-              className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
-            />
+            <MatchupRankBadge teamId={team.id}>
+              <Image
+                src={team.logoUrl}
+                alt=""
+                width={36}
+                height={36}
+                className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+              />
+            </MatchupRankBadge>
           ) : (
             <div
               aria-hidden="true"
