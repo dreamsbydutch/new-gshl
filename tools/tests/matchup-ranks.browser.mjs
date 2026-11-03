@@ -43,7 +43,7 @@ const compiled = await build({
       const matchups=[{id:"m1",awayTeamId:"t1",homeTeamId:"t8",awayScore:12,homeScore:10},{id:"m2",awayTeamId:"t9",homeTeamId:"t10",awayScore:9,homeScore:7}];
       export const usePowerRankingsPreview=()=>({data:window.rankingsLoading?undefined:{entries:[1,8,9].map(rank=>({team:{id:"t"+rank},rank}))}});
       export const useWeeklyScheduleSummary=()=>({data:{teams,matchups},isLoading:false});
-      export const useHomeScoreboard=()=>({week:{id:"week"},matchupGroups:[{week:{id:"week",weekNum:1},teams,matchups,phase:"current",isCurrentWeek:true}],isLoading:false,isScheduleLoading:false});`,
+      export const useHomeScoreboard=()=>({week:{id:"week"},matchupGroups:[{week:{id:"week",weekNum:1},teams,matchups,powerRankings:window.rankingsLoading?undefined:{entries:[1,8,9].map(rank=>({team:{id:"t"+rank},rank}))},phase:"current",isCurrentWeek:true}],isLoading:false,isScheduleLoading:false});`,
         }));
       },
     },
@@ -66,7 +66,13 @@ try {
     await page.addStyleTag({ content: css });
     await page.addScriptTag({ content: compiled.outputFiles[0].text });
     await page.waitForSelector('[aria-label="Power ranking 8"]');
-    assert.equal(await page.$eval('[aria-label="Matchup heading fixture"] [aria-label="Power ranking 2"]', el => el.textContent.trim()), "#2");
+    assert.equal(
+      await page.$eval(
+        '[aria-label="Matchup heading fixture"] [aria-label="Power ranking 2"]',
+        (el) => el.textContent.trim(),
+      ),
+      "#2",
+    );
     for (const selector of [
       'section[aria-label="GSHL matchups"]',
       'nav[aria-label="Matchups from this week"]',

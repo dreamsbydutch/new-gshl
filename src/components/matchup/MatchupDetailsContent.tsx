@@ -423,7 +423,11 @@ export function MatchupDetailsContent({
   const details = matchupQuery.data;
   const matchup = details?.matchup ?? null;
   const season = details?.season ?? null;
-  const { data: powerRankings } = usePowerRankingsPreview(matchup?.seasonId, 8, matchup?.weekId);
+  const { data: powerRankings } = usePowerRankingsPreview(
+    matchup?.seasonId,
+    8,
+    matchup?.weekId,
+  );
   const week = details?.week ?? null;
   const records = useMatchupRecords(matchupId, week?.startDate, week?.endDate);
   const isComplete = isMatchupDetailsComplete(matchup, week);

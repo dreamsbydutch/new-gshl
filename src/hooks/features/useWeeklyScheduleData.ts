@@ -51,7 +51,11 @@ export function useWeeklyScheduleData(
     enabled: hasWeekScope,
   });
   const { data, isLoading, error } = scheduleQuery;
-  const { data: powerRankings } = usePowerRankingsPreview(selectedSeasonId, 8, selectedWeekId);
+  const { data: powerRankings } = usePowerRankingsPreview(
+    selectedSeasonId,
+    8,
+    selectedWeekId,
+  );
 
   return {
     selectedSeasonId,
