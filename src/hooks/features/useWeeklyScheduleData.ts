@@ -52,9 +52,9 @@ export function useWeeklyScheduleData(
   });
   const { data, isLoading, error } = scheduleQuery;
   const { data: powerRankings } = usePowerRankingsPreview(
-    selectedSeasonId,
+    selectedSeasonId ?? undefined,
     8,
-    selectedWeekId,
+    selectedWeekId ?? undefined,
   );
 
   return {
