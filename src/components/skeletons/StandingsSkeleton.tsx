@@ -108,7 +108,7 @@ function BracketColumnSkeleton({ cards }: { cards: number }) {
   return (
     <section className="min-w-0">
       <div
-        className={`grid h-[42rem] gap-4 ${
+        className={`playoff-bracket-height grid gap-4 ${
           cards === 1
             ? "content-center"
             : cards === 2
@@ -126,7 +126,7 @@ function BracketColumnSkeleton({ cards }: { cards: number }) {
 
 export function PlayoffBracketSkeleton() {
   return (
-    <section className="pb-12 pt-2">
+    <section className="py-2">
       <div className="mx-auto max-w-[96rem] px-3 sm:px-6">
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
           <div className="grid auto-cols-[minmax(148px,1fr)] grid-flow-col gap-5 lg:auto-cols-[minmax(280px,1fr)] lg:gap-10">
