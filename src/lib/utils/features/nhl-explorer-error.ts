@@ -1,6 +1,10 @@
 /** Keep diagnostics limited to code failures, without URLs containing query data. */
 export function sanitizeNhlExplorerErrorText(value: string) {
   return value
+    .replace(
+      /(["']?(?:password|secret|token|cookie|authorization)["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/gi,
+      "$1[redacted]",
+    )
     .replace(/https?:\/\/[^\s)]+/g, (url) => {
       try {
         const parsed = new URL(url);
@@ -9,6 +13,7 @@ export function sanitizeNhlExplorerErrorText(value: string) {
         return "[url]";
       }
     })
+    .replace(/(\/[^\s?#[\]"'<>]*)[?#][^\s)"'<>]*/g, "$1")
     .replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, "[email]")
     .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
     .replace(

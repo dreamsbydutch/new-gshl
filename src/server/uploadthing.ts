@@ -13,7 +13,10 @@ export const imageFileRouter = {
     .middleware(async () => {
       const session = await auth();
 
-      if (session?.user.role !== "commissioner") {
+      if (
+        session?.user.status !== "active" ||
+        session.user.role !== "commissioner"
+      ) {
         throw new Error("Forbidden");
       }
 

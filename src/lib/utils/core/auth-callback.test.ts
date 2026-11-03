@@ -7,6 +7,19 @@ import {
   resolveSafeCallbackPath,
 } from "./auth-callback";
 
+void test("normalized callbacks cannot become protocol-relative redirects", () => {
+  for (const value of [
+    "https://gshl.test//other.test/path",
+    "https://gshl.test/a/..//other.test",
+    "/a/..//other.test",
+  ]) {
+    assert.equal(
+      resolveSafeCallbackPath(value, "https://gshl.test"),
+      "/lockerroom",
+    );
+  }
+});
+
 void test("uses the first forwarded origin and preserves callback context", () => {
   const headers = new Headers({
     host: "internal.test:3000",

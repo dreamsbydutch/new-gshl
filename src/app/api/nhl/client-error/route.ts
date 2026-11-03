@@ -1,6 +1,10 @@
 import { auth } from "@gshl-auth";
 import { z } from "zod";
 import { sanitizeNhlExplorerErrorText } from "@gshl-utils/features/nhl-explorer-error";
+import {
+  readLimitedRequestText,
+  RequestBodyError,
+} from "@gshl-utils/core/request-body";
 
 const payload = z
   .object({
@@ -26,15 +30,14 @@ export async function POST(request: Request) {
     return new Response(null, { status: 429 });
   if (attempts.size > 500) attempts.clear();
   attempts.set(key, now);
-  if (Number(request.headers.get("content-length")) > 8192)
-    return new Response(null, { status: 413 });
-  const text = await request.text();
-  if (text.length > 8192) return new Response(null, { status: 413 });
   let data: z.infer<typeof payload>;
   try {
+    const text = await readLimitedRequestText(request, 8192);
     data = payload.parse(JSON.parse(text));
-  } catch {
-    return new Response(null, { status: 400 });
+  } catch (error) {
+    return new Response(null, {
+      status: error instanceof RequestBodyError ? error.status : 400,
+    });
   }
   console.error(
     "[nhl-explorer-client-error]",
