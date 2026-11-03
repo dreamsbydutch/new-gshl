@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useHomeScoreboard } from "@gshl-hooks/features/useHomeScoreboard";
-import { usePowerRankingsPreview } from "@gshl-hooks/main/usePowerRankings";
 import { buildMatchupNavigationHref } from "@gshl-utils";
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
@@ -28,7 +27,6 @@ export function HomeScoreboardSkeleton() {
 export function HomeScoreboard({ seasonId }: { seasonId: string }) {
   const { week, matchupGroups, isLoading, isScheduleLoading, error } =
     useHomeScoreboard(seasonId);
-  const { data: powerRankings } = usePowerRankingsPreview(seasonId, 8);
   const track = useRef<HTMLUListElement>(null);
   const currentWeekStart = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -71,6 +69,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
             {matchupGroups.map(
               ({
                 matchups,
+                powerRankings,
                 week: matchupWeek,
                 teams,
                 phase: matchupPhase,
