@@ -78,7 +78,7 @@ export function WeekMatchupScroller({
                             : undefined
                         }
                       >
-                        {rank && rank <= 8 ? rank : null}
+                        {rank && rank <= 8 ? `#${rank}` : null}
                       </span>
                       {team?.logoUrl ? (
                         <Image
