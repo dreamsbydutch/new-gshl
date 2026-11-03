@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePowerRankingsPreview } from "../main/usePowerRankings";
 import { useWeeks, useWeeklyScheduleSummary } from "../main";
 import { selectWeekForReferenceDate } from "@gshl-utils/domain/schedule";
 import {
@@ -41,6 +42,21 @@ export function useHomeScoreboard(seasonId: string) {
     seasonId,
     weekId: nextWeek?.id ?? null,
   });
+  const previousPower = usePowerRankingsPreview(
+    previousWeek ? seasonId : undefined,
+    8,
+    previousWeek?.id,
+  );
+  const currentPower = usePowerRankingsPreview(
+    week ? seasonId : undefined,
+    8,
+    week?.id,
+  );
+  const nextPower = usePowerRankingsPreview(
+    nextWeek ? seasonId : undefined,
+    8,
+    nextWeek?.id,
+  );
   const today = now ? toLocalIsoDateOnly(now) : "";
   const start = normalizeDateOnlyValue(week?.startDate);
   const end = normalizeDateOnlyValue(week?.endDate);
@@ -59,10 +75,18 @@ export function useHomeScoreboard(seasonId: string) {
 
   return {
     matchupGroups: [
-      { week: previousWeek, data: previousSchedule.data },
-      { week, data: schedule.data },
-      { week: nextWeek, data: nextSchedule.data },
-    ].flatMap(({ week: matchupWeek, data }) => {
+      {
+        week: previousWeek,
+        data: previousSchedule.data,
+        powerRankings: previousPower.data,
+      },
+      { week, data: schedule.data, powerRankings: currentPower.data },
+      {
+        week: nextWeek,
+        data: nextSchedule.data,
+        powerRankings: nextPower.data,
+      },
+    ].flatMap(({ week: matchupWeek, data, powerRankings }) => {
       if (!matchupWeek || !data.matchups.length) return [];
       const startsAt = normalizeDateOnlyValue(matchupWeek.startDate);
       const endsAt = normalizeDateOnlyValue(matchupWeek.endDate);
@@ -74,6 +98,7 @@ export function useHomeScoreboard(seasonId: string) {
             : "current";
       return [
         {
+          powerRankings,
           matchups: data.matchups,
           week: matchupWeek,
           teams: data.teams,

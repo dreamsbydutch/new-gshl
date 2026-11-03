@@ -697,7 +697,12 @@ export const ownerRankings = query({
 });
 
 export const powerRankingsPreview = query({
-  args: { seasonId: v.id("seasons"), take: v.number() },
+  args: {
+    seasonId: v.id("seasons"),
+    take: v.number(),
+    weekId: v.optional(v.id("weeks")),
+    referenceDate: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const season = await ctx.db.get(args.seasonId);
     if (!season) return null;
@@ -716,11 +721,27 @@ export const powerRankingsPreview = query({
       }),
     ]);
     const teamRows = await enrichTeamRows(ctx, rawTeams, false);
+    const requestedWeek = args.weekId
+      ? weeks.find((week) => week._id === args.weekId)
+      : null;
+    if (args.weekId && !requestedWeek) return null;
+    const today = args.referenceDate ?? utcTimestampToDateKey(Date.now());
+    const historicalWeek =
+      requestedWeek && utcTimestampToDateKey(requestedWeek.startDate) <= today
+        ? requestedWeek
+        : null;
+    const eligibleWeeks = args.weekId
+      ? weeks.filter((week) =>
+          historicalWeek
+            ? week._id === historicalWeek._id
+            : utcTimestampToDateKey(week.startDate) <= today,
+        )
+      : weeks;
     const teamIds = new Set(teamRows.map((team) => String(team.id)));
     const rankedWeeks = [];
     const rankedWeeklyStats = [];
 
-    for (const week of weeks) {
+    for (const week of eligibleWeeks) {
       const projected = projectStandingsPowerHistory({
         weeks: [week],
         weeklyStats: await ctx.db
@@ -744,10 +765,11 @@ export const powerRankingsPreview = query({
       teams: teamRows,
       weeks: rankedWeeks,
       weeklyStats: rankedWeeklyStats,
-      seasonStats,
-      preseason: rankedWeeks.length
-        ? []
-        : await preseasonPower(ctx, args.seasonId),
+      seasonStats: args.weekId ? [] : seasonStats,
+      preseason:
+        rankedWeeks.length || historicalWeek
+          ? []
+          : await preseasonPower(ctx, args.seasonId),
     });
     const requestedTake = Number.isFinite(args.take) ? args.take : 8;
     const limit = Math.min(Math.max(Math.trunc(requestedTake), 1), 16);

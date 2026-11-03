@@ -17,7 +17,7 @@ export function WeekMatchupScroller({
   matchupId: string;
 }) {
   const { data, isLoading } = useWeeklyScheduleSummary({ seasonId, weekId });
-  const { data: powerRankings } = usePowerRankingsPreview(seasonId, 8);
+  const { data: powerRankings } = usePowerRankingsPreview(seasonId, 8, weekId);
   const track = useRef<HTMLUListElement>(null);
   const selected = useRef<HTMLLIElement>(null);
   useEffect(() => {
