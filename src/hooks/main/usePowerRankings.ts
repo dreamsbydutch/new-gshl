@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toLocalIsoDateOnly } from "@gshl-utils/core/date";
-import { useQuery } from "convex/react";
+import { useQueries, type RequestForQueries } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -19,20 +20,31 @@ export function usePowerRankingsPreview(
     const timer = setInterval(refresh, 60_000);
     return () => clearInterval(timer);
   }, [weekId]);
-  const result = useQuery(
-    api.frontend.powerRankingsPreview,
-    seasonId && (!weekId || referenceDate)
-      ? {
+  const requests = useMemo<RequestForQueries>(
+    () => seasonId && (!weekId || referenceDate) ? {
+      rankings: {
+        query: api.frontend.powerRankingsPreview,
+        args: {
           seasonId: seasonId as Id<"seasons">,
           take,
           ...(weekId ? { weekId: weekId as Id<"weeks">, referenceDate } : {}),
-        }
-      : "skip",
+        },
+      },
+    } : {},
+    [seasonId, take, weekId, referenceDate],
   );
+  // Rankings are optional homepage data. Keep server failures local while
+  // preserving the subscription so a backend recovery updates both consumers.
+  const results = useQueries(requests);
+  const result = results.rankings as
+    | FunctionReturnType<typeof api.frontend.powerRankingsPreview>
+    | Error
+    | undefined;
+  const error = result instanceof Error ? result : null;
 
   return {
-    data: result,
-    isLoading: Boolean(seasonId) && result === undefined,
-    error: null,
+    data: result instanceof Error ? undefined : result,
+    isLoading: Boolean(seasonId) && !error && result === undefined,
+    error,
   };
 }
