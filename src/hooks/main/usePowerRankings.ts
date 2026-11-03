@@ -5,7 +5,6 @@ import { toLocalIsoDateOnly } from "@gshl-utils/core/date";
 import { useQueries, type RequestForQueries } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 
 export function usePowerRankingsPreview(
   seasonId?: string,
@@ -21,16 +20,19 @@ export function usePowerRankingsPreview(
     return () => clearInterval(timer);
   }, [weekId]);
   const requests = useMemo<RequestForQueries>(
-    () => seasonId && (!weekId || referenceDate) ? {
-      rankings: {
-        query: api.frontend.powerRankingsPreview,
-        args: {
-          seasonId: seasonId as Id<"seasons">,
-          take,
-          ...(weekId ? { weekId: weekId as Id<"weeks">, referenceDate } : {}),
-        },
-      },
-    } : {},
+    (): RequestForQueries =>
+      seasonId && (!weekId || referenceDate)
+        ? {
+            rankings: {
+              query: api.frontend.powerRankingsPreview,
+              args: {
+                seasonId,
+                take,
+                ...(weekId ? { weekId, referenceDate } : {}),
+              },
+            },
+          }
+        : {},
     [seasonId, take, weekId, referenceDate],
   );
   // Rankings are optional homepage data. Keep server failures local while

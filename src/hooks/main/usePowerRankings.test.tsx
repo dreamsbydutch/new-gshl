@@ -50,4 +50,3 @@ void test("rankings query failure stays local and recovers for both homepage con
   assert.equal(states.at(-1)?.data, null);
   act(() => root!.unmount());
 });
-
