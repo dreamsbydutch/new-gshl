@@ -1,4 +1,5 @@
 "use client";
+import { MatchupRankBadge } from "@gshl-components/matchup/MatchupRankBadge";
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
@@ -70,32 +71,24 @@ export function WeekMatchupScroller({
                       title={team?.name ?? "Team TBD"}
                       className="flex items-center justify-between gap-2"
                     >
-                      <span
-                        className="w-2.5 shrink-0 text-[10px] font-medium tabular-nums text-slate-500"
-                        aria-label={
-                          rank && rank <= 8
-                            ? `Power ranking ${rank}`
-                            : undefined
-                        }
-                      >
-                        {rank && rank <= 8 ? `#${rank}` : null}
-                      </span>
-                      {team?.logoUrl ? (
-                        <Image
-                          src={team.logoUrl}
-                          alt=""
-                          width={22}
-                          height={22}
-                          className="h-[22px] w-[22px] shrink-0 object-contain"
-                        />
-                      ) : (
-                        <span
-                          aria-hidden="true"
-                          className="flex h-[22px] w-[22px] items-center justify-center text-xs"
-                        >
-                          {team?.name?.slice(0, 1) ?? "?"}
-                        </span>
-                      )}
+                      <MatchupRankBadge rank={rank}>
+                        {team?.logoUrl ? (
+                          <Image
+                            src={team.logoUrl}
+                            alt=""
+                            width={22}
+                            height={22}
+                            className="h-[22px] w-[22px] shrink-0 object-contain"
+                          />
+                        ) : (
+                          <span
+                            aria-hidden="true"
+                            className="flex h-[22px] w-[22px] items-center justify-center text-xs"
+                          >
+                            {team?.name?.slice(0, 1) ?? "?"}
+                          </span>
+                        )}
+                      </MatchupRankBadge>
                       <span className="sr-only">
                         {team?.name ?? "Team TBD"}
                       </span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { MatchupRankBadge } from "./MatchupRankBadge";
 import Image from "next/image";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import type { MatchupDetailsPayload, MatchupDetailsTeam } from "@gshl-types";
@@ -74,13 +75,15 @@ function TeamPreview({
     <div className="min-w-0 p-3">
       <h3 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
         {team?.logoUrl ? (
-          <Image
-            src={team.logoUrl}
-            alt=""
-            width={24}
-            height={24}
-            className="h-6 w-6 object-contain"
-          />
+          <MatchupRankBadge teamId={team.id}>
+            <Image
+              src={team.logoUrl}
+              alt=""
+              width={24}
+              height={24}
+              className="h-6 w-6 object-contain"
+            />
+          </MatchupRankBadge>
         ) : null}
         <span className="truncate">{team?.name ?? "Team"}</span>
       </h3>

@@ -5,6 +5,7 @@
  * --------------------------
  * Orchestrates the bounded weekly schedule projection for the selected week.
  */
+import { usePowerRankingsPreview } from "../main/usePowerRankings";
 import { useNav, useWeeklyScheduleSummary } from "../main";
 import {
   type UseWeeklyScheduleDataOptions,
@@ -50,11 +51,26 @@ export function useWeeklyScheduleData(
     enabled: hasWeekScope,
   });
   const { data, isLoading, error } = scheduleQuery;
+  const { data: powerRankings } = usePowerRankingsPreview(
+    selectedSeasonId ?? undefined,
+    8,
+    selectedWeekId ?? undefined,
+  );
 
   return {
     selectedSeasonId,
     selectedWeekId,
-    matchups: data.matchups,
+    matchups: data.matchups.map((matchup) => ({
+      ...matchup,
+      awayRank:
+        powerRankings?.entries.find(
+          (entry) => entry.team.id === matchup.awayTeamId,
+        )?.rank ?? null,
+      homeRank:
+        powerRankings?.entries.find(
+          (entry) => entry.team.id === matchup.homeTeamId,
+        )?.rank ?? null,
+    })),
     teams: data.teams,
     isLoading,
     error,

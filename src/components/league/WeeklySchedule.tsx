@@ -1,5 +1,6 @@
 "use client";
 
+import { MatchupRankBadge } from "@gshl-components/matchup/MatchupRankBadge";
 import Image from "next/image";
 import Link from "next/link";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
@@ -18,7 +19,6 @@ import {
   getMatchupOutcomeClass,
   isScheduleItemComplete,
   isValidScheduleMatchup,
-  shouldDisplayRank,
   TEAM_LOGO_DIMENSIONS,
 } from "@gshl-utils";
 import { useAuthSession, useWeeklyScheduleData } from "@gshl-hooks";
@@ -76,22 +76,19 @@ const TeamDisplay = ({ team, rank, isAway = false }: TeamDisplayProps) => {
 
   return (
     <div className="col-span-4 flex min-w-0 items-center justify-center gap-1.5 p-1 text-center">
-      {shouldDisplayRank(rank) ? (
-        <span className="font-oswald text-xs font-bold text-slate-500">
-          #{rank}
-        </span>
-      ) : null}
-      {team.logoUrl ? (
-        <Image
-          className="h-9 w-9 object-contain"
-          src={team.logoUrl}
-          alt={logoAlt}
-          width={TEAM_LOGO_DIMENSIONS.width}
-          height={TEAM_LOGO_DIMENSIONS.height}
-        />
-      ) : (
-        <div className="flex h-9 w-9 items-center justify-center rounded bg-gray-100" />
-      )}
+      <MatchupRankBadge rank={rank}>
+        {team.logoUrl ? (
+          <Image
+            className="h-9 w-9 object-contain"
+            src={team.logoUrl}
+            alt={logoAlt}
+            width={TEAM_LOGO_DIMENSIONS.width}
+            height={TEAM_LOGO_DIMENSIONS.height}
+          />
+        ) : (
+          <div className="flex h-9 w-9 items-center justify-center rounded bg-gray-100" />
+        )}
+      </MatchupRankBadge>
       <span className="sr-only font-oswald text-sm sm:not-sr-only sm:max-w-28 sm:truncate">
         {team.name}
       </span>

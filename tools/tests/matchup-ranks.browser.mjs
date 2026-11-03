@@ -8,9 +8,10 @@ const compiled = await build({
     contents: `
     import React from "react";
     import {createRoot} from "react-dom/client";
+    import {MatchupRankBadge, MatchupRanksContext} from "./src/components/matchup/MatchupRankBadge";
     import {HomeScoreboard} from "./src/components/home/HomeScoreboard";
     import {WeekMatchupScroller} from "./src/components/matchup/WeekMatchupScroller";
-    createRoot(document.getElementById("root")).render(<main className="p-4 space-y-8"><HomeScoreboard seasonId="season"/><WeekMatchupScroller seasonId="season" weekId="week" matchupId="m1"/></main>);
+    createRoot(document.getElementById("root")).render(<main className="p-4 space-y-8"><section aria-label="Matchup heading fixture"><MatchupRanksContext.Provider value={new Map([["heading", 2]])}><MatchupRankBadge teamId="heading"><img width="64" height="64" alt="Heading team" /></MatchupRankBadge></MatchupRanksContext.Provider></section><HomeScoreboard seasonId="season"/><WeekMatchupScroller seasonId="season" weekId="week" matchupId="m1"/></main>);
   `,
     resolveDir: process.cwd(),
     loader: "tsx",
@@ -37,12 +38,12 @@ const compiled = await build({
               : path === "next/link"
                 ? 'import React from "react"; export default props => <a {...props}/>;'
                 : path === "@gshl-utils"
-                  ? 'export const cn=(...args)=>args.filter(Boolean).join(" "); export const buildMatchupNavigationHref=id=>"/matchup/"+id;'
+                  ? 'export { shouldDisplayRank } from "./src/lib/utils/domain/schedule"; export const cn=(...args)=>args.filter(Boolean).join(" "); export const buildMatchupNavigationHref=id=>"/matchup/"+id;'
                   : `const teams=[1,8,9,10].map(rank=>({id:"t"+rank,name:"Team "+rank,logoUrl:"data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="14" fill="steelblue"/></svg>')}));
       const matchups=[{id:"m1",awayTeamId:"t1",homeTeamId:"t8",awayScore:12,homeScore:10},{id:"m2",awayTeamId:"t9",homeTeamId:"t10",awayScore:9,homeScore:7}];
       export const usePowerRankingsPreview=()=>({data:window.rankingsLoading?undefined:{entries:[1,8,9].map(rank=>({team:{id:"t"+rank},rank}))}});
       export const useWeeklyScheduleSummary=()=>({data:{teams,matchups},isLoading:false});
-      export const useHomeScoreboard=()=>({week:{id:"week"},matchupGroups:[{week:{id:"week",weekNum:1},teams,matchups,phase:"current",isCurrentWeek:true}],isLoading:false,isScheduleLoading:false});`,
+      export const useHomeScoreboard=()=>({week:{id:"week"},matchupGroups:[{week:{id:"week",weekNum:1},teams,matchups,powerRankings:window.rankingsLoading?undefined:{entries:[1,8,9].map(rank=>({team:{id:"t"+rank},rank}))},phase:"current",isCurrentWeek:true}],isLoading:false,isScheduleLoading:false});`,
         }));
       },
     },
@@ -65,6 +66,13 @@ try {
     await page.addStyleTag({ content: css });
     await page.addScriptTag({ content: compiled.outputFiles[0].text });
     await page.waitForSelector('[aria-label="Power ranking 8"]');
+    assert.equal(
+      await page.$eval(
+        '[aria-label="Matchup heading fixture"] [aria-label="Power ranking 2"]',
+        (el) => el.textContent.trim(),
+      ),
+      "#2",
+    );
     for (const selector of [
       'section[aria-label="GSHL matchups"]',
       'nav[aria-label="Matchups from this week"]',
@@ -77,16 +85,18 @@ try {
           ...root.querySelectorAll('[aria-label^="Power ranking"]'),
         ].every(
           (el) =>
-            el.nextElementSibling.tagName === "IMG" &&
-            el.getBoundingClientRect().right <=
-              el.nextElementSibling.getBoundingClientRect().left,
+            el.previousElementSibling?.tagName === "IMG" &&
+            el.getBoundingClientRect().left <
+              el.previousElementSibling.getBoundingClientRect().left &&
+            el.getBoundingClientRect().top <
+              el.previousElementSibling.getBoundingClientRect().top,
         ),
         overflow: [...root.querySelectorAll("a")].some(
           (el) => el.scrollWidth > el.clientWidth,
         ),
         links: root.querySelectorAll('a[href^="/matchup/"]').length,
       }));
-      assert.deepEqual(result.ranks, ["1", "8"]);
+      assert.deepEqual(result.ranks, ["#1", "#8"]);
       assert.equal(result.placement, true);
       assert.equal(result.overflow, false);
       assert.equal(result.links, 2);
@@ -101,7 +111,7 @@ try {
   }
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: both scrollers show ranks 1 and 8, hide ranks 9+ and unranked teams, place ranks left of logos, preserve links, and fit 390/1440px viewports.",
+    "PASS: both scrollers show ranks 1 and 8, hide ranks 9+ and unranked teams, place ranks above-left of logos, preserve links, and fit 390/1440px viewports.",
   );
 } finally {
   await browser.close();

@@ -1,4 +1,5 @@
 import React from "react";
+import { MatchupRankBadge } from "./MatchupRankBadge";
 import Image from "next/image";
 import type {
   MatchupDetailsTeam,
@@ -16,13 +17,15 @@ export function GameTeamLogo({
   size?: 20 | 24;
 }) {
   return team?.logoUrl ? (
-    <Image
-      src={team.logoUrl}
-      alt={team.name ?? team.abbr ?? "GSHL team"}
-      width={size}
-      height={size}
-      className={`${size === 20 ? "h-5 w-5" : "h-6 w-6"} shrink-0 object-contain`}
-    />
+    <MatchupRankBadge teamId={team.id}>
+      <Image
+        src={team.logoUrl}
+        alt={team.name ?? team.abbr ?? "GSHL team"}
+        width={size}
+        height={size}
+        className={`${size === 20 ? "h-5 w-5" : "h-6 w-6"} shrink-0 object-contain`}
+      />
+    </MatchupRankBadge>
   ) : (
     <span className="shrink-0 text-[11px] font-semibold">
       {team?.abbr ?? "Team"}
