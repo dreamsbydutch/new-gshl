@@ -119,17 +119,6 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
         <>
           <div className="min-w-0">
             <div className="min-w-0">
-              <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 px-3 py-3 sm:px-5">
-                <h3 className="font-barlow text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  Most missed starts
-                </h3>
-                <span className="text-xs text-slate-500">
-                  <strong className="tabular-nums text-slate-800">
-                    {data.missedStarts}
-                  </strong>{" "}
-                  league total
-                </span>
-              </div>
               <table className="w-full table-fixed text-sm">
                 <caption className="sr-only">
                   Season missed-start rankings and coaching percentages. Higher
@@ -159,9 +148,6 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                     </th>
                     <th scope="col" className="py-2 pr-3 text-right sm:pr-5">
                       Coaching %
-                      <span className="block text-xs font-normal normal-case leading-4 tracking-normal">
-                        BS / decisions
-                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -211,16 +197,6 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                           {entry.coachingPercentage === null
                             ? "—"
                             : `${entry.coachingPercentage.toFixed(1)}%`}
-                        </span>
-                        <span
-                          className="mt-0.5 block text-xs leading-4 tabular-nums text-slate-400"
-                          aria-label={`${entry.badStarts} bad starts from ${entry.startDecisions} start decisions`}
-                        >
-                          {entry.coachingPercentage === null
-                            ? entry.startDecisions === 0
-                              ? "No decisions"
-                              : "Unavailable"
-                            : `${entry.badStarts} / ${entry.startDecisions}`}
                         </span>
                       </td>
                     </tr>
