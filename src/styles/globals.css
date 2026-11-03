@@ -136,3 +136,29 @@
     break-inside: avoid;
   }
 }
+
+/* Preserve card sizes while fitting round spacing to the usable viewport.
+   Short screens retain enough height for four cards and their gaps. */
+.playoff-bracket-height {
+  height: clamp(
+    32rem,
+    calc(
+      100dvh - var(--app-mobile-header-height) - var(--app-primary-nav-height) -
+        var(--app-page-context-row-height) - env(safe-area-inset-top) -
+        env(safe-area-inset-bottom) - 4.5rem
+    ),
+    42rem
+  );
+}
+@media (min-width: 1024px) {
+  .playoff-bracket-height {
+    height: clamp(
+      32rem,
+      calc(
+        100dvh - var(--app-primary-nav-height) -
+          var(--app-page-context-row-height) - env(safe-area-inset-top) - 4.5rem
+      ),
+      42rem
+    );
+  }
+}

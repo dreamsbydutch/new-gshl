@@ -154,8 +154,8 @@ function MatchupCard({
           className={cn(
             "absolute left-1/2 h-[72px] w-[72px] -translate-x-1/2 object-contain",
             conferenceLogoPlacement === "above"
-              ? "bottom-full mb-3"
-              : "top-full mt-3",
+              ? "bottom-full"
+              : "top-full",
           )}
         />
       ) : null}
@@ -223,7 +223,7 @@ function BracketColumn({
   return (
     <section className="min-w-0">
       <h2 className="sr-only">{column.title}</h2>
-      <div className="relative grid h-[42rem] grid-rows-4 gap-4">
+      <div className="playoff-bracket-height relative grid grid-rows-4 gap-4">
         {Array.from({ length: Math.floor(matchupCount / 2) }).map(
           (_, pairIndex) => {
             const lineClass = getConnectorLineClasses(
@@ -274,7 +274,7 @@ export function PlayoffBracket({
   }
 
   return (
-    <section className="pb-12 pt-2" aria-label={`${season.name} playoffs`}>
+    <section className="py-2" aria-label={`${season.name} playoffs`}>
       <div className="mx-auto max-w-[96rem] px-3 sm:px-6">
         <div
           role="region"
