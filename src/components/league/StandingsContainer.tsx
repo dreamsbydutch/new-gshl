@@ -49,16 +49,23 @@ function getRank(
   groupTitle: string,
   fallbackRank: number,
 ): number | string {
+  if (
+    standingsType === "conference" ||
+    (standingsType === "wildcard" &&
+      groupTitle !== "Wildcard" &&
+      groupTitle !== "Out of the Playoffs")
+  ) {
+    return fallbackRank;
+  }
+
   const stats = team.seasonStats;
   if (!stats) return fallbackRank;
 
   const rank =
-    standingsType === "conference"
-      ? stats.conferenceRk
-      : standingsType === "wildcard" &&
-          (groupTitle === "Wildcard" || groupTitle === "Out of the Playoffs")
-        ? stats.wildcardRk
-        : stats.overallRk;
+    standingsType === "wildcard" &&
+    (groupTitle === "Wildcard" || groupTitle === "Out of the Playoffs")
+      ? stats.wildcardRk
+      : stats.overallRk;
   const numericRank = Number(rank);
   return Number.isFinite(numericRank) && numericRank > 0
     ? numericRank
