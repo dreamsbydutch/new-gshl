@@ -62,12 +62,14 @@ export function useWeeklyScheduleData(
     selectedWeekId,
     matchups: data.matchups.map((matchup) => ({
       ...matchup,
-      awayRank: powerRankings?.entries.find(
-        (entry) => entry.team.id === matchup.awayTeamId,
-      )?.rank,
-      homeRank: powerRankings?.entries.find(
-        (entry) => entry.team.id === matchup.homeTeamId,
-      )?.rank,
+      awayRank:
+        powerRankings?.entries.find(
+          (entry) => entry.team.id === matchup.awayTeamId,
+        )?.rank ?? null,
+      homeRank:
+        powerRankings?.entries.find(
+          (entry) => entry.team.id === matchup.homeTeamId,
+        )?.rank ?? null,
     })),
     teams: data.teams,
     isLoading,
