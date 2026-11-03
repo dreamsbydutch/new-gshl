@@ -87,7 +87,8 @@ export function resolveSafeCallbackPath(
     const candidate = new URL(callbackUrl, allowedOrigin);
     if (
       (candidate.protocol !== "http:" && candidate.protocol !== "https:") ||
-      candidate.origin !== allowedOrigin.origin
+      candidate.origin !== allowedOrigin.origin ||
+      candidate.pathname.startsWith("//")
     ) {
       return fallback;
     }

@@ -6,6 +6,18 @@ import {
   sanitizeNhlExplorerErrorText,
 } from "./nhl-explorer-error";
 
+void test("diagnostics redact quoted JSON credentials and relative URL query data", () => {
+  const text = sanitizeNhlExplorerErrorText(
+    'failed /api/example?private=value#secret {"token":"private", "password": "two words"}',
+  );
+  assert.ok(!text.includes("private"));
+  assert.ok(!text.includes("two words"));
+  assert.ok(!text.includes("#secret"));
+  for (const url of ["/?private=value#secret", "/#secret"]) {
+    assert.equal(sanitizeNhlExplorerErrorText(`failed ${url}`), "failed /");
+  }
+});
+
 void test("stale dynamic imports reload only once while ordinary render errors do not", () => {
   const values = new Map<string, string>();
   const storage = {
