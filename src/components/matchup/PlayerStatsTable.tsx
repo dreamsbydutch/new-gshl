@@ -340,7 +340,7 @@ export function PlayerStatsTable({
                     {group.players.map((player) => (
                       <tr
                         key={player.id}
-                        className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && table.rosterIds.has(player.id) && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50/60" : "odd:bg-white even:bg-slate-50/70"}`}
+                        className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && table.rosterIds.has(player.id) && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50" : "odd:bg-white even:bg-slate-50"}`}
                       >
                         {tableColumns.map((column) => {
                           if (column.key === "today")
@@ -495,7 +495,7 @@ export function PlayerStatsTable({
                 {injuredPlayers.map((player) => (
                   <tr
                     key={player.id}
-                    className="group border-b border-red-100 bg-red-50/40 transition-colors hover:bg-red-50"
+                    className="group border-b border-red-100 bg-red-50 transition-colors hover:bg-red-50"
                   >
                     {tableColumns.map((column) => {
                       if (column.key === "today")
