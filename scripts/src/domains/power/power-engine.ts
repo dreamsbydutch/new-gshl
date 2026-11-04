@@ -10,6 +10,7 @@ import {
 } from "@gshl-lib/data/convex-store";
 import { SeasonType } from "@gshl-lib/types/enums";
 import { weeklyCategoryStrength } from "../../runtime/power-category-strength";
+import { buildWeeklyTalentSnapshots } from "../../runtime/weekly-roster-talent";
 import {
   buildPreseasonStandingsProjections,
   seasonCategories,
@@ -276,6 +277,16 @@ function createPowerEngineContext(
     );
   });
   const playerNhlRows = modelCache.get("PlayerNHLStatLine") ?? [];
+  const talentSnapshots = buildWeeklyTalentSnapshots({
+    season,
+    seasons,
+    teams,
+    weeks: modelCache.get("Week") ?? [],
+    playerDays: days,
+    draftPicks: picks,
+    playerNhlRows,
+    teamWeeks: modelCache.get("TeamWeekStatLine") ?? [],
+  });
   const preseason =
     rosters.length && playerNhlRows.some((row) => Number(row.GP) > 0)
       ? buildPreseasonStandingsProjections({
@@ -296,6 +307,7 @@ function createPowerEngineContext(
     console,
     PowerRankingsAlgo: {},
     LeagueRuntime: {
+      talentSnapshots,
       weeklyCategoryStrength,
       preseasonProjections: preseason,
       readModel(modelName: string): DatabaseRecord[] {

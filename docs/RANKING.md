@@ -782,8 +782,8 @@ categories count, including plus/minus when configured.
 The fixed opening projection counts as one-quarter of a completed week of prior
 evidence. After N completed weeks with team evidence, its weight is
 `0.25 / (N + 0.25)`: 100% before any results, 20% after one week, 11.1% after
-two, and 2.4% after ten. Empty weeks do not consume confidence. Rolling player
-talent and seeded Elo retain smaller supporting contributions. These weights
+two, and 2.4% after ten. Empty weeks do not consume confidence. Projected roster
+strength and seeded Elo retain smaller supporting contributions. These weights
 are a responsiveness policy, not a fitted reliability estimate. The projection's
 score uses the same `50 + 25 × standardized composite` display scale as weekly power.
 
@@ -796,27 +796,87 @@ the person across franchises. See [objectives and evaluation](product/power-rank
 for the opening forecast's formula, retrospective evidence and ownership-data
 limits. That report describes the earlier in-season policy.
 
+Elo starts each season at `1500 + 75 * opening roster talent Z + 35 * historical power Z`.
+
 The standard in-season composite is:
 
-| Signal                                         | Weight |
-| ---------------------------------------------- | -----: |
-| Recency-weighted completed-week performance    |    85% |
-| Matchup Elo through the previous week          |    10% |
-| Rolling roster talent at the start of the week |     5% |
+| Signal                                               | Weight |
+| ---------------------------------------------------- | -----: |
+| Recency-weighted completed-week performance          |    75% |
+| Matchup Elo through the previous week                |    10% |
+| Projected roster category strength entering the week |    15% |
 
 `gmLadderRating` and `powerGmScore` retain the absolute and league-standardized
 career ladder snapshots for diagnostics. The ladder no longer contributes
 directly to weekly power; owner history already informs the opening forecast.
 
+### Weekly roster talent
+
+`weekly-roster-category-v1` replaces the weighted player-rating average. The
+latest full player-day roster snapshot on or before the week's start supplies
+membership, positional eligibility and IR status; completed draft picks are
+the fallback before snapshots exist. Departed players are never unioned into a
+new snapshot. Every rostered player remains represented, with conservative
+position priors and explicit coverage counts for unproven players.
+
+The shared preseason player projection supplies rates and availability from the
+preceding three NHL seasons, with small-sample shrinkage and stale-history
+workload reduction. Finalized current-season player-day appearances strictly
+before the week starts update those rates, including bench appearances. Player
+ratings, owner history and actual matchup results never enter talent. Traded
+player appearances are deduplicated by player/date. Current evidence has a
+28-day half-life and 20 prior appearances of rate shrinkage. Availability uses
+ten prior NHL opportunities; only a played appearance or verified missed-game
+flag counts as an opportunity, never an off day. Current IR/IR+ slots contribute
+no projected appearances; this is an availability assumption, not a medical forecast.
+
+A deterministic 512-sample daily lineup allocation enforces the season's active
+slots and multi-position eligibility on a typical 3.2-game NHL week. Player-keyed
+stratified draws keep existing player opportunities unchanged when depth is added.
+The lineup maximizes an additive category-rate utility using a fixed historical
+player reference. Goalie ratios pool projected saves/shots and goals/minutes;
+the seven-day appearance distribution supplies goalie-minimum qualification risk.
+
+Projected categories are compared with neutral team weeks from the preceding
+three seasons, with counting categories normalized to seven days. A smoothed
+empirical comparison supplies category-point estimates; goalie estimates are
+discounted by qualification probability. The smoothing width is 0.35 historical
+standard deviations, with floors of one count, 0.1 GAA and 0.005 save percentage.
+When a category lacks history, its comparison uses the projected current league,
+explicitly marked as a fallback. Summed category-point estimates are standardized
+across teams; `powerTalent = 50 + 25 * Z`, with a bounded 0–100 UI display. Older
+unversioned snapshots retain their original display conversion, and changes across
+talent model versions are hidden.
+
+A missing roster snapshot with no draft fallback is unrated (`powerTalent: null`)
+and supplies no talent adjustment. Such teams are excluded from the talent
+standardization pool; missing membership is never treated as a known weak roster.
+
+`powerTalentModel` and `powerTalentDetails` retain category forecasts and point
+estimates, roster size, unproven/IR counts, snapshot date, comparison source,
+appearance projections and goalie qualification. The talent tooltip summarizes
+coverage. The overall weights and Elo seed above use this new talent Z.
+
+These are explicit modeling policies, not fitted reliability estimates or
+calibrated win probabilities. Tests cover prospective cutoffs, bench depth,
+positions, IR, goalie pooling, missing evidence, trades and deterministic replay.
+No new held-out historical predictive validation is claimed. Daily independence,
+imperfect historical roster coverage, unobserved free-agent appearances and the
+additive lineup objective remain limitations. Actual upcoming schedule volume is
+deliberately excluded. No production recomputation accompanies this change;
+previously published entering-week snapshots remain unchanged.
+
+### Completed-week form
+
 The legacy `powerStatEwma` field holds the normalized recency-weighted mean of
-completed-week performance. Weights use a **two-week half-life**: a performance
-from two weeks earlier has half the weight of the latest completed week, and
-one from four weeks earlier has one-quarter. All observed weeks in the current
+completed-week performance. Weights use a **four-week half-life**: a performance
+from four weeks earlier has half the weight of the latest completed week, and
+one from eight weeks earlier has one-quarter. All observed weeks in the current
 season remain in the calculation; there is no rolling-window cutoff. Normalize
 the weights by their sum so the opening week is not an oversized EWMA seed.
 After four completed weeks, newest-to-oldest weights are approximately
-39.1%, 27.6%, 19.5%, and 13.8%. After ten weeks, the latest week still supplies
-30.2% of the performance signal instead of shrinking to 10%. A week's
+31.8%, 26.8%, 22.5%, and 18.9%. After ten weeks, the latest week still supplies
+19.3% of the performance signal instead of shrinking to 10%. A week's
 performance blends league-relative category strength (50%), matchup points
 (25%) and category margin (25%); the latest week is counted once. Active and
 empty weeks add no observations; gaps still age older evidence relative to the

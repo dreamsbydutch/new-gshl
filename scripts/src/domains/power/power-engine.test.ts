@@ -137,6 +137,67 @@ function rowByTeamWeek(
   return row;
 }
 
+void test("Elo seeds use 75 points of talent and 35 points of history per Z", async () => {
+  const input = fixture(4, 4);
+  input.seasons.unshift({ id: "prior", year: 2025 });
+  input.weeks.unshift({
+    id: "prior-week",
+    seasonId: "prior",
+    weekType: "RS",
+    endDate: "2025-12-31",
+  });
+  for (const [suffix, rating, signal] of [
+    ["a", 80, 1],
+    ["b", 40, -1],
+  ] as const) {
+    input.teams.push({
+      id: `prior-${suffix}`,
+      seasonId: "prior",
+      franchiseId: `franchise-${suffix}`,
+    });
+    input.teamWeeks!.push({
+      seasonId: "prior",
+      weekId: "prior-week",
+      gshlTeamId: `prior-${suffix}`,
+      powerComposite: signal,
+    });
+    (input.playerNhlRows ??= []).push({
+      seasonId: "prior",
+      playerId: suffix,
+      overallRating: rating,
+      GP: 82,
+      G: rating,
+      nhlPos: ["C"],
+      posGroup: "F",
+    });
+    (input.playerDays ??= []).push({
+      seasonId,
+      weekId: "week-1",
+      date: "2026-07-01",
+      gshlTeamId: `team-${suffix}`,
+      playerId: suffix,
+    });
+  }
+  const result = await runPowerRankingsFixture(seasonId, input, {
+    todayDate: "2026-07-25",
+  });
+  assert.equal(
+    rowByTeamWeek(result.weekUpdates!, "week-1", "team-a").powerEloPre,
+    1610,
+  );
+  assert.equal(
+    rowByTeamWeek(result.weekUpdates!, "week-1", "team-b").powerEloPre,
+    1390,
+  );
+  const row = rowByTeamWeek(result.weekUpdates!, "week-2", "team-a");
+  assert.ok(
+    Math.abs(
+      Number(row.powerComposite) -
+        (0.2 + 0.8 * (0.75 * Number(row.powerStatEwma) + 0.15 + 0.1)),
+    ) < 1e-10,
+  );
+});
+
 void test("the first completed week supplies the full observed form signal", async () => {
   const result = await runPowerRankingsFixture(seasonId, fixture(4, 4), {
     todayDate: "2026-07-25",
@@ -146,7 +207,7 @@ void test("the first completed week supplies the full observed form signal", asy
   assert.equal(row.powerStatEwma, row.powerStatScore);
 });
 
-void test("completed form normalizes two-week half-life weights across every season week", async () => {
+void test("completed form normalizes four-week half-life weights across every season week", async () => {
   const input = fixture(0, 1);
   input.weeks[2]!.isActive = false;
   input.weeks[3]!.isActive = true;
@@ -161,7 +222,7 @@ void test("completed form normalizes two-week half-life weights across every sea
   const firstScore = Number(first.powerStatScore);
   const secondScore = Number(second.powerStatScore);
   const thirdScore = Number(third.powerStatScore);
-  const decay = Math.SQRT1_2;
+  const decay = Math.pow(0.5, 1 / 4);
   assert.ok(
     Math.abs(
       Number(second.powerStatEwma) -
@@ -205,7 +266,9 @@ void test("an empty week ages older evidence when the next completed performance
   const first = rowByTeamWeek(result.weekUpdates!, "week-2", "team-a");
   const latest = rowByTeamWeek(result.weekUpdates!, "week-4", "team-a");
   const expected =
-    (Number(first.powerStatScore) * 0.5 + Number(latest.powerStatScore)) / 1.5;
+    (Number(first.powerStatScore) * Math.SQRT1_2 +
+      Number(latest.powerStatScore)) /
+    (1 + Math.SQRT1_2);
   assert.ok(Math.abs(Number(latest.powerStatEwma) - expected) < 1e-10);
 });
 
@@ -255,14 +318,14 @@ void test("recent form stays responsive late in the season while the oldest week
     (await ratingAfter(10, false)) - (await ratingAfter(10, true, 0));
   const weightMass = Array.from(
     { length: 10 },
-    (_, age) => Math.SQRT1_2 ** age,
+    (_, age) => Math.pow(0.5, 1 / 4) ** age,
   ).reduce((sum, weight) => sum + weight, 0);
   assert.ok(earlyMovement > 0);
   assert.ok(Math.abs(earlyMovement / lateMovement - weightMass) < 1e-10);
-  assert.ok(lateMovement / earlyMovement > 0.3);
+  assert.ok(lateMovement / earlyMovement > 0.19);
   assert.ok(oldestMovement > 0, "oldest season evidence is never dropped");
   assert.ok(
-    Math.abs(oldestMovement / lateMovement - Math.SQRT1_2 ** 9) < 1e-10,
+    Math.abs(oldestMovement / lateMovement - Math.pow(0.5, 1 / 4) ** 9) < 1e-10,
   );
 });
 
@@ -429,7 +492,7 @@ void test("completed prior-season awards seed the next season", async () => {
   );
 });
 
-void test("rolling roster talent excludes the rated week's player results", async () => {
+void test("roster talent uses raw prior appearances and excludes the rated week's results", async () => {
   const data = fixture(4, 4);
   data.seasons.unshift({
     id: "season-0",
@@ -480,6 +543,19 @@ void test("rolling roster talent excludes the rated week's player results", asyn
       playerId: "player-b",
     },
   ];
+  for (const row of data.playerDays ?? []) {
+    row.nhlPos = ["C"];
+    row.posGroup = "F";
+    row.GP = 1;
+    row.G =
+      row.weekId === "week-1"
+        ? row.playerId === "player-a"
+          ? 3
+          : 0
+        : row.playerId === "player-a"
+          ? 0
+          : 100;
+  }
   data.playerWeeks = [
     {
       seasonId,

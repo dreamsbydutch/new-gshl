@@ -163,6 +163,8 @@ test("standings power history strips wide rows and unranked statistics", () => {
         powerStatEwma: 1.2,
         powerEloPre: 1510,
         powerTalent: null,
+        powerTalentModel: null,
+        powerTalentDetails: null,
         powerRk: 2,
       },
     ],

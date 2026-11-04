@@ -151,6 +151,7 @@ export interface PowerRankingEntry {
   performance?: number | null;
   elo?: number | null;
   talent?: number | null;
+  talentExplanation?: string;
   ratingChanges?: {
     rating: number | null;
     performance: number | null;
@@ -225,6 +226,14 @@ export interface PowerRankingWeeklyStat {
   powerStatEwma?: number | null;
   powerEloPre?: number | null;
   powerTalent?: number | null;
+  powerTalentModel?: string | null;
+  powerTalentDetails?: {
+    rosterSize: number;
+    unprovenPlayers: number;
+    unavailablePlayers: number;
+    snapshotDate: string;
+    reference: string;
+  } | null;
   powerRating?: number | null;
   powerRk?: number | null;
 }

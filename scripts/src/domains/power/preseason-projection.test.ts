@@ -342,7 +342,22 @@ void test("opening evidence shrinks smoothly as completed-week evidence accumula
     const prior = preseason.find(
       (team) => team.teamId === row.gshlTeamId,
     )!.score;
-    const regular = 0.85 * Number(row.powerStatEwma);
+    const peers = (result.weekUpdates ?? []).filter(
+      (peer) => peer.weekId === row.weekId,
+    );
+    const eloMean =
+      peers.reduce((sum, p) => sum + Number(p.powerEloPre), 0) / peers.length;
+    const eloSd =
+      Math.sqrt(
+        peers.reduce(
+          (sum, p) => sum + (Number(p.powerEloPre) - eloMean) ** 2,
+          0,
+        ) / peers.length,
+      ) || 1;
+    const regular =
+      0.75 * Number(row.powerStatEwma) +
+      0.15 * ((Number(row.powerTalent) - 50) / 25) +
+      (0.1 * (Number(row.powerEloPre) - eloMean)) / eloSd;
     assert.ok(
       Math.abs(
         Number(row.powerComposite) - (weight * prior + (1 - weight) * regular),
@@ -386,13 +401,13 @@ void test("an opening upset can overturn a stronger preseason forecast", async (
         weekId: "w1",
         gshlTeamId: team.id,
         GP: 30,
-        G: team.id === "b" ? 5 : 3,
-        A: 10,
-        P: 20,
-        PPP: 5,
-        SOG: 80,
-        HIT: 25,
-        BLK: 20,
+        G: team.id === "b" ? 8 : 1,
+        A: team.id === "b" ? 40 : 1,
+        P: team.id === "b" ? 50 : 2,
+        PPP: team.id === "b" ? 15 : 1,
+        SOG: team.id === "b" ? 100 : 20,
+        HIT: team.id === "b" ? 40 : 10,
+        BLK: team.id === "b" ? 40 : 10,
         W: 2,
         GAA: 3,
         SVP: 0.9,

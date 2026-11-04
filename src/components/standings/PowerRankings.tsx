@@ -186,7 +186,10 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                     {[
                       ["Form", "Recent performance (0–100 display scale)"],
                       ["Elo", "Matchup Elo"],
-                      ["Talent", "Roster talent (0–100 display scale)"],
+                      [
+                        "Talent",
+                        "Projected roster category strength (0–100 display scale)",
+                      ],
                     ].map(([label, description]) => (
                       <th
                         key={label}
@@ -233,6 +236,11 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                         (key) => (
                           <td
                             key={key}
+                            title={
+                              key === "talent"
+                                ? entry.talentExplanation
+                                : undefined
+                            }
                             className="border-b border-slate-100 px-2.5 py-2 text-right font-mono tabular-nums text-slate-700"
                           >
                             <RatingValue
