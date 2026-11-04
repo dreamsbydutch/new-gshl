@@ -119,8 +119,10 @@ const inputDisplayRating = (
 const performanceDisplayRating = (value: unknown) =>
   inputDisplayRating(value, 0, 40);
 // Raw talent 60 -> 20, 67.5 -> 50, 75 -> 80.
-const talentDisplayRating = (value: unknown) =>
-  inputDisplayRating(value, 67.5, 4);
+const talentDisplayRating = (value: unknown, model?: string | null) =>
+  model === "weekly-roster-category-v1"
+    ? inputDisplayRating(value, 50, 1)
+    : inputDisplayRating(value, 67.5, 4);
 
 const compareWeeks = (left: PowerRankingWeek, right: PowerRankingWeek) => {
   const dateDifference =
@@ -203,7 +205,10 @@ export function buildPowerRankings({
     ({ team, latestStat, rank }) => {
       const previousStat = previousByTeam.get(team.id);
       const performance = performanceDisplayRating(latestStat?.powerStatEwma);
-      const talent = talentDisplayRating(latestStat?.powerTalent);
+      const talent = talentDisplayRating(
+        latestStat?.powerTalent,
+        latestStat?.powerTalentModel,
+      );
       const change = (current: unknown, previous: unknown) => {
         const currentRating = validRating(current);
         const previousRating = validRating(previous);
@@ -229,6 +234,9 @@ export function buildPowerRankings({
         performance,
         elo: latestStat?.powerEloPre ?? null,
         talent,
+        talentExplanation: latestStat?.powerTalentDetails
+          ? `Projected category strength on a typical schedule. ${latestStat.powerTalentDetails.rosterSize} rostered; ${latestStat.powerTalentDetails.unprovenPlayers} without played history; ${latestStat.powerTalentDetails.unavailablePlayers} on IR. Roster snapshot: ${latestStat.powerTalentDetails.snapshotDate || "draft"}. Reference: ${latestStat.powerTalentDetails.reference}.`
+          : "Historical roster rating average.",
         ratingChanges: {
           rating: change(latestStat?.powerRating, previousStat?.powerRating),
           performance: change(
@@ -236,10 +244,16 @@ export function buildPowerRankings({
             performanceDisplayRating(previousStat?.powerStatEwma),
           ),
           elo: change(latestStat?.powerEloPre, previousStat?.powerEloPre),
-          talent: change(
-            talent,
-            talentDisplayRating(previousStat?.powerTalent),
-          ),
+          talent:
+            latestStat?.powerTalentModel !== previousStat?.powerTalentModel
+              ? null
+              : change(
+                  talent,
+                  talentDisplayRating(
+                    previousStat?.powerTalent,
+                    previousStat?.powerTalentModel,
+                  ),
+                ),
         },
         previousRank,
         rankChange: previousRank === null ? null : previousRank - rank,

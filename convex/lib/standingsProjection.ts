@@ -97,6 +97,8 @@ type StandingsPowerStatSource = {
   powerStatEwma?: NumericStat;
   powerEloPre?: NumericStat;
   powerTalent?: NumericStat;
+  powerTalentModel?: string | null;
+  powerTalentDetails?: StandingsPowerHistory["weeklyStats"][number]["powerTalentDetails"];
   powerRating?: NumericStat;
   powerRk?: NumericStat;
 };
@@ -159,6 +161,16 @@ export function projectStandingsPowerHistory(options: {
           powerStatEwma: normalizedNumeric(stat.powerStatEwma),
           powerEloPre: normalizedNumeric(stat.powerEloPre),
           powerTalent: normalizedNumeric(stat.powerTalent),
+          powerTalentModel: stat.powerTalentModel ?? null,
+          powerTalentDetails: stat.powerTalentDetails
+            ? {
+                rosterSize: stat.powerTalentDetails.rosterSize,
+                unprovenPlayers: stat.powerTalentDetails.unprovenPlayers,
+                unavailablePlayers: stat.powerTalentDetails.unavailablePlayers,
+                snapshotDate: stat.powerTalentDetails.snapshotDate,
+                reference: stat.powerTalentDetails.reference,
+              }
+            : null,
           powerRating: normalizedNumeric(stat.powerRating),
           powerRk,
         },

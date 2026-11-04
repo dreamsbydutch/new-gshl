@@ -62,6 +62,35 @@ const weekly = (
   powerRating,
 });
 
+void test("versioned talent displays its forecast scale and hides changes across models", () => {
+  const result = buildPowerRankings({
+    teams: [makeTeam("a", "Alpha")],
+    weeks: [makeWeek(1), makeWeek(2)],
+    weeklyStats: [
+      { ...weekly("a", 1, 1, 60), powerTalent: 70 },
+      {
+        ...weekly("a", 2, 1, 65),
+        powerTalent: 75,
+        powerTalentModel: "weekly-roster-category-v1",
+        powerTalentDetails: {
+          rosterSize: 20,
+          unprovenPlayers: 2,
+          unavailablePlayers: 1,
+          snapshotDate: "2026-02-01",
+          reference: "historical",
+        },
+      },
+    ],
+    seasonStats: [],
+  });
+  assert.equal(result.entries[0]!.talent, 75);
+  assert.equal(result.entries[0]!.ratingChanges?.talent, null);
+  assert.match(
+    result.entries[0]!.talentExplanation!,
+    /2 without played history/,
+  );
+});
+
 void test("shows preseason projections before games without inventing weekly history", () => {
   const preseason = [
     { teamId: "a", rank: 2, rating: 40 },
