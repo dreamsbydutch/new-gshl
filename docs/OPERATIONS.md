@@ -54,6 +54,23 @@ to use their existing season-scoped queries.
 
 The web app and Convex deploy independently.
 
+Local Next.js development can use the production Convex URL; it does not require
+a separate Convex dev deployment or a running `convex dev` process. Keep the
+unused development deployment paused in Convex deployment settings. Pausing
+retains data and skips crons; queued scheduled jobs can run if it is resumed.
+
+Code-defined crons are opt-in: set `GSHL_AUTOMATION_ENABLED=true` **in the
+production Convex environment before deploying**. Leave it unset on dev and
+preview deployments. Without it, deploying registers no cron jobs (including
+notifications, managed schedules, UFA resolution, previews, and Weekly editions).
+This gate controls cron registration, not manually invoked functions or work
+already queued with the scheduler. Editing local code does not stop deployed
+jobs; pause the unused deployment to stop its execution immediately.
+
+The automatic template Weekly scanner publishes each milestone once. Existing
+editions, including hidden and edited editions, are skipped before loading
+source data. Use manual regeneration for corrections to an existing issue.
+
 - `npx convex codegen` regenerates local bindings without deploying.
 - `npx convex dev` pushes and watches the configured development deployment.
 - `npx convex deploy` deploys functions and schema to the selected target.
