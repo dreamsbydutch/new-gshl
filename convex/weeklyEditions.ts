@@ -3270,6 +3270,20 @@ export const scanDueMilestones = internalMutation({
         finalWeek,
       ).filter((item) => item.scheduledFor <= today)) {
         result.processed += 1;
+        // Automatic publication is once per milestone. Manual regeneration
+        // remains available when source data or editorial content changes.
+        const existing = await ctx.db
+          .query("weeklyEditions")
+          .withIndex("by_seasonId_editionKey", (q) =>
+            q
+              .eq("seasonId", season._id)
+              .eq("editionKey", `milestone:${milestone.issueType}`),
+          )
+          .unique();
+        if (existing) {
+          result.unchanged += 1;
+          continue;
+        }
         try {
           const generated = await generateMilestoneForSeason(
             ctx,
@@ -3297,17 +3311,6 @@ async function queueAutomaticEdition(
   week: Doc<"weeks">,
   issueType: WeeklyEditionIssueType,
 ) {
-  if (issueType === "weekly" || issueType === "final_recap") {
-    // The operator writes this only after final stats, power and standings.
-    // Waiting for data must not consume any of the three writing attempts.
-    if (!week.weeklyRefreshCompletedAt) return false;
-    const matchups = await ctx.db
-      .query("matchups")
-      .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
-      .collect();
-    if (!matchups.length || matchups.some((row) => !row.isComplete))
-      return false;
-  }
   const editionKey =
     issueType === "weekly"
       ? `week:${String(week._id)}`
@@ -3338,6 +3341,17 @@ async function queueAutomaticEdition(
       existing.inactiveSectionIds?.length)
   )
     return false;
+  if (issueType === "weekly" || issueType === "final_recap") {
+    // The operator writes this only after final stats, power and standings.
+    // Waiting for data must not consume any of the three writing attempts.
+    if (!week.weeklyRefreshCompletedAt) return false;
+    const matchups = await ctx.db
+      .query("matchups")
+      .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+      .collect();
+    if (!matchups.length || matchups.some((row) => !row.isComplete))
+      return false;
+  }
   const values = {
     seasonId: season._id,
     weekId: week._id,

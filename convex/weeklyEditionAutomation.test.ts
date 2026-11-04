@@ -128,6 +128,51 @@ function fixture() {
   return f;
 }
 
+void test("template scanner does not rebuild existing milestones", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: Date.parse("2025-10-16T12:00:00Z"),
+  });
+  const prior = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    const f = fixture();
+    f.put("weeks", "future", {
+      seasonId: "s",
+      weekNum: 2,
+      endDate: "2025-10-14",
+    });
+    for (const issueType of [
+      "final_recap",
+      "resigning_outlook",
+      "offseason_market",
+      "pre_draft",
+      "preseason",
+    ]) {
+      f.put("weeklyEditions", issueType, {
+        seasonId: "s",
+        editionKey: `milestone:${issueType}`,
+        status: "published",
+      });
+    }
+    const originalQuery = f.ctx.db.query.bind(f.ctx.db);
+    let sourceReads = 0;
+    f.ctx.db.query = ((table: string) => {
+      if (!["seasons", "weeks", "weeklyEditions"].includes(table))
+        sourceReads++;
+      return originalQuery(table);
+    }) as typeof f.ctx.db.query;
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(
+      sourceReads,
+      0,
+      "existing milestones must not reload their source data",
+    );
+  } finally {
+    if (prior !== undefined) process.env.OPENAI_API_KEY = prior;
+  }
+});
+
 void test("weekly scanner catches a missed refreshed week when a newer week has ended", async (t) => {
   t.mock.timers.enable({
     apis: ["Date"],
@@ -407,8 +452,8 @@ void test("automatic scanner skips an already-succeeded job without reading its 
     });
     const originalQuery = f.ctx.db.query.bind(f.ctx.db);
     f.ctx.db.query = ((table: string) => {
-      if (table === "weeklyEditions")
-        throw new Error("scanner should not read an already-generated edition");
+      if (table === "weeklyEditions" || table === "matchups")
+        throw new Error("scanner should not read sources for a completed job");
       return originalQuery(table);
     }) as typeof f.ctx.db.query;
 
@@ -555,6 +600,10 @@ void test("weekly recap compares entering ranks with next week's ranks", async (
   assert.equal(prepared.facts.powerMovers[0]?.currentRank, 7);
   assert.equal(prepared.facts.powerMovers[0]?.rankChange, -3);
   await f.ctx.db.delete("next" as never);
-  const missing = await invokeMutation(prepareAiGeneration, f.ctx, { seasonId: "s", weekId: "w", issueType: "weekly" }) as { facts: WeeklyEditionFactPacket };
+  const missing = (await invokeMutation(prepareAiGeneration, f.ctx, {
+    seasonId: "s",
+    weekId: "w",
+    issueType: "weekly",
+  })) as { facts: WeeklyEditionFactPacket };
   assert.deepEqual(missing.facts.powerMovers, []);
 });
