@@ -31,19 +31,16 @@ const views = [
   {
     id: "teams",
     label: "Team talent",
-    description: "Current strength and historical contribution",
     icon: Users,
   },
   {
     id: "contracts",
     label: "Contracts",
-    description: "Salaries at a $100M cap and contract talent",
     icon: Coins,
   },
   {
     id: "players",
     label: "Player GAR",
-    description: "Season contributions above replacement",
     icon: ChartNoAxesCombined,
   },
 ] as const;
@@ -53,42 +50,25 @@ export function NhlExplorer() {
   const requested = new URLSearchParams(search).get("view");
   const view = views.find((item) => item.id === requested)?.id ?? "teams";
   return (
-    <div className="container mx-auto space-y-6 px-4 py-6">
+    <div className="container mx-auto space-y-3 px-3 py-3 sm:px-4">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Around the NHL
-        </p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight">NHL Explorer</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Explore the talent behind the teams, the value of each contract, and
-          what players contribute on the ice.
-        </p>
+        <h1 className="text-xl font-bold tracking-tight">NHL Explorer</h1>
       </header>
-      <nav aria-label="NHL Explorer" className="grid gap-2 sm:grid-cols-3">
-        {views.map(({ id, label, description, icon: Icon }) => (
+      <nav aria-label="NHL Explorer" className="grid grid-cols-3 gap-2">
+        {views.map(({ id, label, icon: Icon }) => (
           <Link
             key={id}
             href={`/nhl?view=${id}`}
             aria-current={view === id ? "page" : undefined}
             className={cn(
-              "flex items-start gap-3 rounded-xl border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500",
+              "flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:text-sm",
               view === id
                 ? "border-slate-900 bg-slate-900 text-white"
                 : "bg-background hover:bg-muted",
             )}
           >
-            <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-            <span>
-              <span className="block font-semibold">{label}</span>
-              <span
-                className={cn(
-                  "mt-1 block text-xs",
-                  view === id ? "text-slate-300" : "text-muted-foreground",
-                )}
-              >
-                {description}
-              </span>
-            </span>
+            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="font-semibold">{label}</span>
           </Link>
         ))}
       </nav>
