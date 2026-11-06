@@ -454,7 +454,8 @@ export function validateNhlTalentPeerAging(
       peer.distance < distance ||
       !finite(peer.weight) ||
       peer.weight <= 0 ||
-      peer.weight !== Math.exp(-peer.distance / 2)
+      // Math.exp may differ by a few ULPs across Node and browser engines.
+      Math.abs(peer.weight - Math.exp(-peer.distance / 2)) > 4 * Number.EPSILON
     )
       fail();
     seen.add(peer.nhlPlayerId);

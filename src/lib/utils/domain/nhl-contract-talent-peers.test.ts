@@ -8,6 +8,30 @@ import {
   createNhlTalentPeerFitter,
   validateNhlTalentPeerAging,
 } from "./nhl-contract-talent-peers";
+import forecastJson from "../../data/nhl-contract-talent-forecast.json";
+import { parseNhlTalentForecastArtifact } from "./nhl-contract-talent-forecast";
+
+void test("saved forecasts tolerate cross-engine exp rounding but reject altered peer weights", (t) => {
+  const exp = Math.exp;
+  // Chromium and the artifact's Node runtime differ by one ULP for this input.
+  t.mock.method(Math, "exp", (x: number) =>
+    x === -0.4245736407143595 / 2 ? 0.8087327032949284 : exp(x),
+  );
+  assert.doesNotThrow(() => parseNhlTalentForecastArtifact(forecastJson));
+  const peer = structuredClone(
+    forecastJson.profiles.find((p) => p.nhlPlayerId === 8476278)!.peerAging!,
+  );
+  peer.nearest[3]!.weight += 1e-8;
+  assert.throws(
+    () => validateNhlTalentPeerAging(peer),
+    /Invalid NHL talent peer/,
+  );
+  peer.nearest[3]!.weight = NaN;
+  assert.throws(
+    () => validateNhlTalentPeerAging(peer),
+    /Invalid NHL talent peer/,
+  );
+});
 
 function source(): NhlTalentAnnualSeason[] {
   return Array.from({ length: 13 }, (_, i) => ({
