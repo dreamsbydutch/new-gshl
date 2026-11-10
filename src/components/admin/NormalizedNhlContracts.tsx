@@ -63,27 +63,9 @@ export function NormalizedNhlContracts({
 function ContractRankings({ readOnly }: { readOnly: boolean }) {
   const view = useNormalizedNhlContracts();
   return (
-    <section className="mx-auto max-w-7xl space-y-5">
+    <section className="mx-auto max-w-7xl space-y-3">
       <div>
-        <h2 className="text-2xl font-bold">NHL contract value and talent</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Each season: cap hit ÷ that season’s team salary cap × $100 million.
-          Add those values and divide by the contract’s full number of years.
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Holistic talent uses goals above replacement per 82 NHL team-game
-          opportunities. Zero is replacement level; negative scores remain
-          negative. Recorded contribution averages completed contract years
-          equally. Current-season contribution is shown separately, and
-          unsupported years are never filled with zero.
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Expected contribution averages age-adjusted annual estimates across
-          every remaining contract season. These use completed{" "}
-          {season(view.forecastOriginYear - 1)} data; the current-year forecast
-          is a full-season estimate, not additional value still to be earned.
-          Salary and cap figures do not affect either contribution score.
-        </p>
+        <h2 className="text-lg font-semibold">Contracts</h2>
         {view.talentError ? (
           <p role="alert" className="mt-2 text-sm text-red-600">
             Holistic talent could not load: {view.talentError}
@@ -95,12 +77,6 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
             {view.talentTotalSeasons}
           </p>
         ) : null}
-        <p className="mt-1 text-sm text-muted-foreground">
-          Calculated live from contract history and your season caps. When
-          season records are missing, a consistent contract AAV is carried
-          across its term and identified in the breakdown. Contracts needing cap
-          figures or term review remain listed below the ranked contracts.
-        </p>
       </div>
 
       {!readOnly && (
@@ -109,10 +85,7 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
             Season salary caps
           </summary>
           <p className="my-3 text-sm text-muted-foreground">
-            Enter the total NHL team salary cap in dollars, not a team’s
-            remaining cap space. Your supplied ceiling values include future
-            seasons through 2041–42. Future figures are your assumptions and can
-            be edited. Saving recalculates every contract immediately.
+            Enter team salary caps in USD. Future values are editable estimates.
           </p>
           <div className="max-h-80 overflow-y-auto">
             <table className="w-full text-sm">
@@ -218,7 +191,7 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
             </p>
           </div>
           <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full text-[11px] leading-tight sm:text-xs">
               <caption className="sr-only">
                 NHL contracts ranked by{" "}
                 {view.sortBy === "salary"
@@ -230,19 +203,19 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
               </caption>
               <thead className="bg-gray-100 text-left">
                 <tr>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-1.5 py-1.5">
                     Rank
                   </th>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-1.5 py-1.5">
                     Player
                   </th>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-1.5 py-1.5">
                     Seasons
                   </th>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-1.5 py-1.5">
                     Years
                   </th>
-                  <th scope="col" className="p-3 text-right">
+                  <th scope="col" className="px-1.5 py-1.5 text-right">
                     AAV
                   </th>
                   <th
@@ -250,7 +223,7 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                     aria-sort={
                       view.sortBy === "salary" ? "descending" : undefined
                     }
-                    className="p-3 text-right"
+                    className="px-1.5 py-1.5 text-right"
                   >
                     Normalized AAV {view.sortBy === "salary" ? "↓" : ""}
                     <br />
@@ -261,7 +234,7 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                     aria-sort={
                       view.sortBy === "actual" ? "descending" : undefined
                     }
-                    className="p-3 text-right"
+                    className="px-1.5 py-1.5 text-right"
                   >
                     Recorded GAR {view.sortBy === "actual" ? "↓" : ""}
                     <br />
@@ -272,7 +245,7 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                     aria-sort={
                       view.sortBy === "forecast" ? "descending" : undefined
                     }
-                    className="p-3 text-right"
+                    className="px-1.5 py-1.5 text-right"
                   >
                     Expected GAR {view.sortBy === "forecast" ? "↓" : ""}
                     <br />
@@ -280,10 +253,10 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                       Remaining years · GAR/82
                     </span>
                   </th>
-                  <th scope="col" className="p-3 text-right">
+                  <th scope="col" className="px-1.5 py-1.5 text-right">
                     Avg. cap share
                   </th>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-1.5 py-1.5">
                     Details
                   </th>
                 </tr>
@@ -291,37 +264,42 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
               <tbody>
                 {view.rows.map((row) => (
                   <Fragment key={row.id}>
-                    <tr className="border-t align-top">
-                      <td className="p-3 tabular-nums">{row.rank ?? "—"}</td>
-                      <th scope="row" className="p-3 text-left font-medium">
+                    <tr className="border-t align-middle">
+                      <td className="px-1.5 py-1.5 tabular-nums">
+                        {row.rank ?? "—"}
+                      </td>
+                      <th
+                        scope="row"
+                        className="whitespace-nowrap px-1.5 py-1.5 text-left font-medium"
+                      >
                         {row.playerName}
-                        <span className="ml-2 text-xs text-muted-foreground">
+                        <span className="ml-1 text-[10px] text-muted-foreground">
                           {row.position}
                         </span>
                       </th>
-                      <td className="whitespace-nowrap p-3">
+                      <td className="whitespace-nowrap px-1.5 py-1.5">
                         {season(row.startSeasonStartYear)} to{" "}
                         {season(row.expirySeasonStartYear)}
                       </td>
-                      <td className="p-3">{row.length}</td>
-                      <td className="p-3 text-right tabular-nums">
+                      <td className="px-1.5 py-1.5">{row.length}</td>
+                      <td className="px-1.5 py-1.5 text-right tabular-nums">
                         {dollars(row.nominalAav)}
                       </td>
-                      <td className="p-3 text-right font-semibold tabular-nums">
+                      <td className="px-1.5 py-1.5 text-right font-semibold tabular-nums">
                         {dollars(row.normalizedAav)}
                       </td>
-                      <td className="p-3 text-right font-semibold tabular-nums">
+                      <td className="px-1.5 py-1.5 text-right font-semibold tabular-nums">
                         {talentScore(row.actualTalent)}
                       </td>
-                      <td className="p-3 text-right font-semibold tabular-nums">
+                      <td className="px-1.5 py-1.5 text-right font-semibold tabular-nums">
                         {talentScore(row.forecastTalent)}
                       </td>
-                      <td className="p-3 text-right tabular-nums">
+                      <td className="px-1.5 py-1.5 text-right tabular-nums">
                         {percent(row.averageCapShare)}
                       </td>
-                      <td className="p-3">
+                      <td className="px-1.5 py-1.5">
                         <button
-                          className="whitespace-nowrap text-blue-700 underline"
+                          className="inline-flex min-h-6 items-center whitespace-nowrap text-blue-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                           aria-expanded={view.expandedId === row.id}
                           aria-controls={`contract-${row.id}`}
                           onClick={() =>
@@ -394,32 +372,11 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                                   </p>
                                 </>
                               ) : null}
-                              {row.talent.forecast.years.length ? (
-                                <p className="text-sm text-muted-foreground">
-                                  {row.talent.forecast.years[0]?.prediction
-                                    .peerAging &&
-                                  row.talent.forecast.years[0].prediction
-                                    .peerAgingWeight > 0
-                                    ? `Development draws on ${row.talent.forecast.years[0].prediction.peerAging.contributingPeers} comparable NHL careers, matched by age, recent performance and workload.`
-                                    : "Development uses broader position trends where comparable careers provide limited forecasting evidence."}
-                                </p>
-                              ) : null}
                               {row.talent.forecast.reasons.length ? (
                                 <p className="text-sm text-muted-foreground">
                                   {row.talent.forecast.reasons.join(". ")}
                                 </p>
                               ) : null}
-                              <p className="text-sm text-muted-foreground">
-                                Forecast checks use historical seasons and known
-                                outcomes; unsupported played seasons remain
-                                unknown. Residual ranges describe those observed
-                                historical errors, not guaranteed future
-                                coverage. Current partial seasons do not enter
-                                delivered averages. Projected averages include
-                                every remaining year; distant years extrapolate
-                                the individual development curve and NHL
-                                participation model.
-                              </p>
                             </div>
                           ) : null}
                           <ContractSeasonTable row={row} />
