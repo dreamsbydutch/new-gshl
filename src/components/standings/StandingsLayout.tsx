@@ -2,7 +2,6 @@
 
 import { useStandingsContextNavigation } from "@gshl-hooks";
 import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
-import { SectionNavigation } from "@gshl-components/nav/SectionNavigation";
 import type { LabeledToggleOption } from "@gshl-types";
 import { StandingsSkeleton } from "@gshl-skeletons";
 
@@ -26,7 +25,6 @@ export function StandingsLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="font-varela">
-      <SectionNavigation section="league" />
       <div
         className="gshl-local-controls"
         role="group"

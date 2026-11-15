@@ -8,7 +8,6 @@ import {
   WeeksToggle,
   TertiaryPageToolbar,
 } from "@gshl-nav";
-import { SectionNavigation } from "@gshl-components/nav/SectionNavigation";
 import type { LabeledToggleOption } from "@gshl-types";
 import { ScheduleSkeleton } from "@gshl-skeletons";
 
@@ -27,7 +26,6 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
     scheduleTypes.find((type) => type.key === scheduleType) ?? null;
   return (
     <div className="font-varela">
-      <SectionNavigation section="league" />
       <div
         className="gshl-local-controls"
         role="group"
