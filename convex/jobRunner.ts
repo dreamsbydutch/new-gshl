@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./lib/scheduling";
 import { selectSeasonScope } from "../src/lib/utils/domain/season-scope";
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-base-to-string */
 import {
@@ -593,7 +594,7 @@ export const advancePipeline = internalMutation({
     });
     if (!child) {
       // Retry admission without creating a competing child.
-      await ctx.scheduler.runAfter(60_000, runner, { runId: args.runId });
+      await scheduleAfter(ctx, 60_000, runner, { runId: args.runId });
       return { state: "waiting" as const };
     }
     return { state: "started" as const, childId: child._id };
@@ -803,7 +804,7 @@ export const run = internalActionGeneric({
           status: "succeeded",
           result: { apply: run.apply === true, counts: batch.progress },
         });
-      else await ctx.scheduler.runAfter(0, runner, args);
+      else await scheduleAfter(ctx, 0, runner, args);
     } catch (error) {
       await ctx.runMutation(mutationRef("jobRunner:finish"), {
         ...args,

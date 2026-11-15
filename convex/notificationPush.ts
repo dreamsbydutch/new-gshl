@@ -1,5 +1,7 @@
 "use node";
 
+import { scheduleAfter } from "./lib/scheduling";
+
 import webPush from "web-push";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
@@ -64,7 +66,8 @@ export const send = internalAction({
         (status === 0 || status === 429 || status >= 500) &&
         args.attempt < 3
       )
-        await ctx.scheduler.runAfter(
+        await scheduleAfter(
+          ctx,
           10000 * 2 ** args.attempt,
           internal.notificationPush.send,
           { ...args, attempt: args.attempt + 1 },

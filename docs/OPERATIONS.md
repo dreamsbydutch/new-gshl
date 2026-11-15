@@ -67,6 +67,15 @@ This gate controls cron registration, not manually invoked functions or work
 already queued with the scheduler. Editing local code does not stop deployed
 jobs; pause the unused deployment to stop its execution immediately.
 
+For an active dev deployment used only for UI testing, set
+`GSHL_SCHEDULED_FUNCTIONS_ENABLED=false` in its Convex environment and deploy the
+guarded backend. This also prevents cron registration and rejects attempts to
+schedule delayed work, including draft timers and notification delivery. Mutations
+that require a timer fail without committing their changes. Leave the flag unset
+in production to preserve scheduling. Check and cancel any previously queued
+functions separately; changing the flag does not cancel existing work. Keep
+`GSHL_AUTOMATION_ENABLED` unset or false in dev as well.
+
 The automatic template Weekly scanner publishes each milestone once. Existing
 editions, including hidden and edited editions, are skipped before loading
 source data. Use manual regeneration for corrections to an existing issue.

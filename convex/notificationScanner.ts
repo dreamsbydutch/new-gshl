@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./lib/scheduling";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { emitNotification } from "./lib/notificationEvents";
@@ -16,7 +17,7 @@ export const scan = internalMutation({
       )
       .take(20);
     for (const season of seasons)
-      await ctx.scheduler.runAfter(0, internal.draft.notifyState, {
+      await scheduleAfter(ctx, 0, internal.draft.notifyState, {
         seasonId: season._id,
       });
     const editions = await ctx.db

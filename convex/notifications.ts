@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./lib/scheduling";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -213,7 +214,7 @@ export const testPush = mutation({
       read: true,
       createdAt: now,
     });
-    await ctx.scheduler.runAfter(0, internal.notificationPush.send, {
+    await scheduleAfter(ctx, 0, internal.notificationPush.send, {
       notificationId,
       deviceId: device._id,
       attempt: 0,
@@ -360,7 +361,7 @@ export const announce = mutation({
       createdAt: now,
       expiresAt: now + 86400000,
     });
-    await ctx.scheduler.runAfter(0, internal.notifications.fanOut, {
+    await scheduleAfter(ctx, 0, internal.notifications.fanOut, {
       eventId,
       cursor: null,
     });
@@ -392,7 +393,9 @@ export const fanOut = internalMutation({
         continue;
       if (
         event.category === "trade_block" &&
-        (user.role !== "owner" || !user.ownerId || user.ownerId === event.excludeOwnerId)
+        (user.role !== "owner" ||
+          !user.ownerId ||
+          user.ownerId === event.excludeOwnerId)
       )
         continue;
       if (event.ownerId && user.role === "viewer") continue;
@@ -427,7 +430,7 @@ export const fanOut = internalMutation({
           .withIndex("by_user", (q) => q.eq("userId", user._id))
           .take(20);
         for (const device of devices)
-          await ctx.scheduler.runAfter(0, internal.notificationPush.send, {
+          await scheduleAfter(ctx, 0, internal.notificationPush.send, {
             notificationId,
             deviceId: device._id,
             attempt: 0,
@@ -435,7 +438,7 @@ export const fanOut = internalMutation({
       }
     }
     if (!result.isDone)
-      await ctx.scheduler.runAfter(0, internal.notifications.fanOut, {
+      await scheduleAfter(ctx, 0, internal.notifications.fanOut, {
         eventId: event._id,
         cursor: result.continueCursor,
       });

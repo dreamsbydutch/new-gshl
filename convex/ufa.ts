@@ -1,3 +1,4 @@
+import { scheduleAfter, scheduleAt } from "./lib/scheduling";
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/prefer-optional-chain */
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
@@ -649,7 +650,7 @@ export const submitOffer = mutation({
           updatedAt: now,
         });
         group = { ...group, deadlineAt: sharedDeadlineAt, updatedAt: now };
-        await ctx.scheduler.runAt(sharedDeadlineAt, internal.ufa.resolveGroup, {
+        await scheduleAt(ctx, sharedDeadlineAt, internal.ufa.resolveGroup, {
           groupId: group._id,
         });
       }
@@ -717,7 +718,7 @@ export const submitOffer = mutation({
         updatedAt: now,
       });
       group = await db.get(groupId);
-      await ctx.scheduler.runAt(deadlineAt, internal.ufa.resolveGroup, {
+      await scheduleAt(ctx, deadlineAt, internal.ufa.resolveGroup, {
         groupId,
       });
     }
@@ -944,7 +945,7 @@ async function queueDueGroups(ctx: any) {
         updatedAt: now,
       });
     }
-    await ctx.scheduler.runAfter(0, internal.ufa.resolveGroup, {
+    await scheduleAfter(ctx, 0, internal.ufa.resolveGroup, {
       groupId: group._id,
     });
   }

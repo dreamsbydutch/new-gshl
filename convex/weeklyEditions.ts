@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./lib/scheduling";
 import { isCategoryImpactRating } from "../src/lib/utils/features/stat-rating";
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/prefer-optional-chain */
 import { ConvexError, v } from "convex/values";
@@ -3390,7 +3391,8 @@ async function queueAutomaticEdition(
     ? job._id
     : await ctx.db.insert("weeklyEditionGenerationJobs", values);
   if (job) await ctx.db.patch(jobId, values);
-  await ctx.scheduler.runAfter(
+  await scheduleAfter(
+    ctx,
     0,
     internal.weeklyEditions.generateAutomaticEdition,
     { jobId, attempt: values.attempts },

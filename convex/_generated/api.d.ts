@@ -51,6 +51,7 @@ import type * as lib_preseasonPower from "../lib/preseasonPower.js";
 import type * as lib_publicProjection from "../lib/publicProjection.js";
 import type * as lib_reporterDirectory from "../lib/reporterDirectory.js";
 import type * as lib_scheduleProjection from "../lib/scheduleProjection.js";
+import type * as lib_scheduling from "../lib/scheduling.js";
 import type * as lib_standingsProjection from "../lib/standingsProjection.js";
 import type * as lib_teamHistoryProjection from "../lib/teamHistoryProjection.js";
 import type * as lib_teamLineup from "../lib/teamLineup.js";
@@ -149,6 +150,7 @@ declare const fullApi: ApiFromModules<{
   "lib/publicProjection": typeof lib_publicProjection;
   "lib/reporterDirectory": typeof lib_reporterDirectory;
   "lib/scheduleProjection": typeof lib_scheduleProjection;
+  "lib/scheduling": typeof lib_scheduling;
   "lib/standingsProjection": typeof lib_standingsProjection;
   "lib/teamHistoryProjection": typeof lib_teamHistoryProjection;
   "lib/teamLineup": typeof lib_teamLineup;

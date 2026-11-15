@@ -1,3 +1,4 @@
+import { scheduleAfter, scheduleAt } from "./lib/scheduling";
 import { selectAutoDraftPlayer } from "../src/lib/utils/features/mock-draft";
 import { nextDraftMode } from "./lib/draftMode";
 import {
@@ -568,7 +569,7 @@ async function completePick(
     clockStartedAt: nowTimestamp,
     expiresAt: nowTimestamp + 3600000,
   });
-  await ctx.scheduler.runAfter(0, internal.draft.notifyState, {
+  await scheduleAfter(ctx, 0, internal.draft.notifyState, {
     seasonId: args.seasonId,
   });
   return {
@@ -601,7 +602,7 @@ export const setTeamMode = mutation({
       draftAuto: args.auto,
       draftTimeoutStreak: 0,
     });
-    await ctx.scheduler.runAfter(0, internal.draft.notifyState, {
+    await scheduleAfter(ctx, 0, internal.draft.notifyState, {
       seasonId: team.seasonId,
     });
   },
@@ -698,7 +699,7 @@ export const undoPick = mutation({
       updatedAt: nowTimestamp,
     });
 
-    await ctx.scheduler.runAfter(0, internal.draft.notifyState, {
+    await scheduleAfter(ctx, 0, internal.draft.notifyState, {
       seasonId: args.seasonId,
     });
     return {
@@ -810,7 +811,8 @@ export const notifyState = internalMutation({
         return;
       }
       if (clock.clockExpiresAt)
-        await ctx.scheduler.runAt(
+        await scheduleAt(
+          ctx,
           clock.clockExpiresAt,
           internal.draft.notifyState,
           {
@@ -833,7 +835,7 @@ export const notifyState = internalMutation({
         title: "Draft starting soon",
         body: `${season.name} starts in ${Math.ceil((start - now) / 60000)} minutes.`,
       });
-      await ctx.scheduler.runAt(start, internal.draft.notifyState, {
+      await scheduleAt(ctx, start, internal.draft.notifyState, {
         seasonId,
       });
       return;
@@ -894,15 +896,11 @@ export const notifyState = internalMutation({
           body: "Less than a minute remains. Make your pick.",
         });
       else
-        await ctx.scheduler.runAt(
-          expiresAt - 60000,
-          internal.draft.notifyState,
-          {
-            seasonId,
-            expectedPickId: active._id,
-            expectedClockStartedAt: clockStartedAt,
-          },
-        );
+        await scheduleAt(ctx, expiresAt - 60000, internal.draft.notifyState, {
+          seasonId,
+          expectedPickId: active._id,
+          expectedClockStartedAt: clockStartedAt,
+        });
     }
     for (const [index, pick] of clock.upcomingPicks.slice(0, 2).entries()) {
       const upcomingOwner = ownerFor(pick);
