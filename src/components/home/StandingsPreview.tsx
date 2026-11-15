@@ -28,9 +28,29 @@ export function StandingsPreview({ seasonId }: { seasonId: string }) {
       ) : !groups.some((group) => group.teams.length) ? (
         <p className="py-2 text-sm text-slate-500">No standings yet.</p>
       ) : (
-        <div className="mx-auto grid w-full max-w-sm grid-cols-2 gap-x-2">
-          {groups.map((group) => (
-            <div key={group.title} className="min-w-0">
+        <div className="mx-auto grid w-full max-w-sm grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] gap-x-1">
+          <div aria-hidden="true" className="col-start-2 row-start-1">
+            <div className="border-b border-slate-100 py-1 text-sm">&nbsp;</div>
+            <ol className="divide-y divide-slate-100">
+              {["1st", "2nd", "3rd", "4th", "5th", "6th", "7th"].map(
+                (place) => (
+                  <li
+                    key={place}
+                    className="box-content flex h-11 items-center justify-center text-xs font-semibold text-slate-600"
+                  >
+                    <span className="rounded bg-slate-100 px-1 py-1">
+                      {place}
+                    </span>
+                  </li>
+                ),
+              )}
+            </ol>
+          </div>
+          {groups.map((group, groupIndex) => (
+            <div
+              key={group.title}
+              className={`row-start-1 min-w-0 ${groupIndex === 0 ? "col-start-1" : "col-start-3"}`}
+            >
               <h3
                 title={group.title}
                 className="truncate border-b border-slate-100 py-1 text-center text-sm font-semibold text-slate-600"
