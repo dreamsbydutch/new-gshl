@@ -48,9 +48,10 @@ export function getSectionNavigation(
   }
   return [
     {
-      label: "Research",
-      href: "/players",
+      label: "Stats",
+      href: "/stats",
       active:
+        pathname === "/stats" ||
         pathname === "/players" ||
         (pathname === "/leagueoffice" && view === "performances"),
     },

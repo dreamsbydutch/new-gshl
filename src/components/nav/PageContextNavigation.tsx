@@ -12,10 +12,8 @@ export function PageContextNavigation({
     <nav
       aria-label={ariaLabel}
       data-page-context-rows={mobileRows}
-      data-page-context-single={mobileRows === 1 ? "" : undefined}
-      data-page-context-double={mobileRows === 2 ? "" : undefined}
       className={cn(
-        "fixed inset-x-0 bottom-[calc(var(--app-primary-nav-height)+env(safe-area-inset-bottom))] z-40 border-t border-slate-200 bg-white/95 shadow-[0_-2px_8px_rgba(15,23,42,0.08)] backdrop-blur lg:sticky lg:bottom-auto lg:top-[calc(var(--app-primary-nav-height)+env(safe-area-inset-top))] lg:rounded-none lg:border-b lg:border-t-0 lg:shadow-none print:hidden",
+        "sticky top-[calc(var(--app-mobile-header-height)+env(safe-area-inset-top))] z-40 border-b border-slate-200 bg-white/95 backdrop-blur lg:top-[calc(var(--app-primary-nav-height)+env(safe-area-inset-top))] print:hidden",
         className,
       )}
     >

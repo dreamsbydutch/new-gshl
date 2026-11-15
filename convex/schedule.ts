@@ -752,6 +752,10 @@ export const teamScheduleStats = query({
     ]);
 
     return {
+      updatedAt: {
+        home: homeStats ? toUtcTimestamp(homeStats.updatedAt) : null,
+        away: awayStats ? toUtcTimestamp(awayStats.updatedAt) : null,
+      },
       home: homeStats ? projectMatchupTeamWeekStats(homeStats) : null,
       away: awayStats ? projectMatchupTeamWeekStats(awayStats) : null,
     };

@@ -48,3 +48,48 @@ export function selectHomePowerRankingPreview<T>(entries: readonly T[]): T[] {
 export function selectHomeUfaPreview<T>(entries: readonly T[]): T[] {
   return entries.slice(0, HOME_UFA_PREVIEW_LIMIT);
 }
+
+import type { LeagueActivityEvent } from "../../types/league-activity";
+
+export function prioritizeHomeActivity(
+  events: readonly LeagueActivityEvent[],
+  teamId?: string,
+  opponentId?: string,
+  contenderIds: readonly string[] = [],
+) {
+  const involved = (event: LeagueActivityEvent, id: string | undefined) =>
+    Boolean(
+      id &&
+        (event.teamId === id ||
+          event.trade?.teamA.id === id ||
+          event.trade?.teamB.id === id),
+    );
+  const priority = (event: LeagueActivityEvent) =>
+    involved(event, teamId)
+      ? 0
+      : involved(event, opponentId)
+        ? 1
+        : contenderIds.some((id) => involved(event, id))
+          ? 2
+          : 3;
+  return [...events]
+    .sort(
+      (a, b) =>
+        priority(a) - priority(b) ||
+        b.date.localeCompare(a.date) ||
+        a.id.localeCompare(b.id),
+    )
+    .slice(0, 6);
+}
+
+export function matchupProgress(
+  start: string | null,
+  end: string | null,
+  now = Date.now(),
+) {
+  if (!start || !end) return null;
+  const from = Date.parse(start),
+    to = Date.parse(end) + 86_400_000;
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
+  return Math.max(0, Math.min(100, ((now - from) / (to - from)) * 100));
+}

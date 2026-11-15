@@ -144,7 +144,7 @@ for (const group of ["main", "features"]) {
     if (!/\.(?:ts|tsx)$/.test(file)) continue;
     if (
       path.basename(file) !== "index.ts" &&
-      !/^use[A-Z][A-Za-z0-9]*\.(?:ts|tsx)$/.test(path.basename(file))
+      !/^use[A-Z][A-Za-z0-9]*(?:\.test)?\.(?:ts|tsx)$/.test(path.basename(file))
     ) {
       failures.push(`Hook filename must start with use: ${relative(file)}`);
     }

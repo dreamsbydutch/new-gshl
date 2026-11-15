@@ -9,7 +9,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, House, Shirt, Trophy, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  House,
+  Shirt,
+  Trophy,
+  CalendarDays,
+  ChartNoAxesCombined,
+} from "lucide-react";
 import { useAppPathname, useGlobalSeasonContextNavigation } from "@gshl-hooks";
 import {
   calculatePageScrollProgress,
@@ -18,6 +25,8 @@ import {
 } from "@gshl-utils";
 import { NavContainer, LinkNavItem } from "./BaseComponents";
 import type { LinkNavItem as LinkNavItemType, NavbarProps } from "@gshl-types";
+import { useOwnerTeam } from "@gshl-hooks/features/useOwnerTeam";
+import { useStatsNavigation } from "@gshl-hooks/main/useNav";
 import { AuthNavControl } from "@gshl-components/auth";
 import { HeaderTeamSelect } from "./HeaderTeamSelect";
 import { MoreNavigationMenu } from "./MoreNavigationMenu";
@@ -32,6 +41,8 @@ import {
  * @returns Primary navigation bar with route-based active states
  */
 export function MainNavbar({ className, search = "" }: NavbarProps) {
+  const owner = useOwnerTeam();
+  const statsNavigation = useStatsNavigation();
   const { pathname } = useAppPathname();
   const routeContext = getAppShellRouteContext(pathname, search);
   const showTeamControl = pathname === "/lockerroom";
@@ -83,21 +94,29 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
     },
     {
       id: "lockerroom",
-      label: "My Team",
-      href: "/lockerroom?view=overview",
+      label: owner.team ? "My Team" : "Teams",
+      href: owner.team
+        ? `/lockerroom?view=roster&owner=${owner.ownerId}&season=${owner.team.seasonId}`
+        : "/teams",
       icon: <Shirt className="h-5 w-5" aria-hidden="true" />,
     },
     {
-      id: "league",
-      label: "League",
-      href: "/league",
+      id: "schedule",
+      label: "Matchups",
+      href: "/schedule?view=week",
+      icon: <CalendarDays className="h-5 w-5" aria-hidden="true" />,
+    },
+    {
+      id: "standings",
+      label: "Standings",
+      href: "/standings",
       icon: <Trophy className="h-5 w-5" aria-hidden="true" />,
     },
     {
-      id: "players",
-      label: "Players",
-      href: "/players",
-      icon: <Users className="h-5 w-5" aria-hidden="true" />,
+      id: "stats",
+      label: "Stats",
+      href: statsNavigation.href,
+      icon: <ChartNoAxesCombined className="h-5 w-5" aria-hidden="true" />,
     },
   ];
   const seasonControlProps = seasonNavigation.selectedSeasonSummary
@@ -113,7 +132,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-800 bg-slate-950 pt-[env(safe-area-inset-top)] text-white shadow-sm lg:hidden print:hidden">
-        <div className="grid h-[var(--app-mobile-header-height)] grid-cols-[4rem_minmax(0,1fr)_7.5rem] items-center px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">
+        <div className="grid h-[var(--app-mobile-header-height)] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">
           <Link
             href="/"
             aria-label="GSHL home"
@@ -150,7 +169,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
                     "hidden min-[360px]:block",
                 )}
               >
-                {routeContext.title}
+                {pathname === "/lockerroom" ? "Team" : routeContext.title}
               </p>
             )}
             {seasonNavigation.showSeasonControl &&
@@ -163,7 +182,12 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
                 <GlobalSeasonSelectFallback placement="mobile" />
               ))}
           </div>
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-1">
+            <MoreNavigationMenu
+              pathname={pathname}
+              isActive={routeContext.activeNavId === "more"}
+              placement="mobile"
+            />
             <AuthNavControl compact />
           </div>
         </div>
@@ -210,11 +234,6 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
                 className="h-full min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-1 py-1 text-[11px]"
               />
             ))}
-            <MoreNavigationMenu
-              pathname={pathname}
-              isActive={routeContext.activeNavId === "more"}
-              placement="mobile"
-            />
           </div>
           <div className="hidden min-w-0 flex-1 items-stretch justify-center gap-1 lg:flex">
             {navItems.map((item) => (

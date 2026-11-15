@@ -35,6 +35,20 @@ export function useSelectedSeasonId() {
   return { selectedSeasonId };
 }
 
+/** Keep the Stats tab's filters and page when switching primary destinations. */
+export function useStatsNavigation(search?: string) {
+  const savedSearch = useNavStore((state) => state.statsSearch);
+  const setStatsSearch = useNavStore((state) => state.setStatsSearch);
+  const { hasHydrated } = useNavigationHydration();
+  useEffect(() => {
+    if (hasHydrated && search !== undefined && search !== savedSearch) {
+      setStatsSearch(search);
+    }
+  }, [hasHydrated, savedSearch, search, setStatsSearch]);
+  const query = hasHydrated ? new URLSearchParams(savedSearch).toString() : "";
+  return { href: query ? `/stats?${query}` : "/stats" };
+}
+
 /**
  * Persistence hydrates after the server/client render boundary. Contextual URL
  * defaults must wait for this signal or they can replace a user's stored state

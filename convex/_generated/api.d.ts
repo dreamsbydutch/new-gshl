@@ -84,6 +84,7 @@ import type * as puckpedia from "../puckpedia.js";
 import type * as reporterBackfill from "../reporterBackfill.js";
 import type * as schedule from "../schedule.js";
 import type * as standings from "../standings.js";
+import type * as stats from "../stats.js";
 import type * as teamHistory from "../teamHistory.js";
 import type * as timestampMigration from "../timestampMigration.js";
 import type * as tradeBlock from "../tradeBlock.js";
@@ -181,6 +182,7 @@ declare const fullApi: ApiFromModules<{
   reporterBackfill: typeof reporterBackfill;
   schedule: typeof schedule;
   standings: typeof standings;
+  stats: typeof stats;
   teamHistory: typeof teamHistory;
   timestampMigration: typeof timestampMigration;
   tradeBlock: typeof tradeBlock;

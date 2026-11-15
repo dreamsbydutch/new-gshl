@@ -51,8 +51,10 @@ void test("GSHL periods display bounded ratings rather than per-appearance avera
   for (const { value: kind } of PERFORMANCE_KINDS) {
     const stats = performanceDisplayStats(kind, source);
     assert.equal(stats.averageRating, undefined);
-    if (kind !== "playerNhl")
+    if (performanceStats(kind).includes("Rating"))
       assert.ok(stats.Rating! >= 0 && stats.Rating! <= 100);
+    if (kind === "playerCareer" || kind === "teamCareer")
+      assert.equal(stats.Rating, undefined);
     assert.ok(!performanceStats(kind).includes("averageRating"));
   }
   assert.equal(

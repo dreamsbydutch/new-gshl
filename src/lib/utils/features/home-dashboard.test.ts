@@ -11,7 +11,57 @@ import {
   selectHomePowerRankingPreview,
   selectHomeUfaPreview,
   isHomeDraftHubVisible,
+  prioritizeHomeActivity,
+  matchupProgress,
 } from "./home-dashboard";
+import type { LeagueActivityEvent } from "../../types/league-activity";
+
+void test("the rundown prioritizes your team, opponent and contenders without mutating league activity", () => {
+  const events: LeagueActivityEvent[] = [
+    "league",
+    "opponent",
+    "own",
+    "contender",
+  ].map((teamId, index) => ({
+    id: String(index),
+    type: "add",
+    date: "2026-11-15",
+    playerId: "player",
+    playerName: "Player",
+    teamId,
+    teamName: teamId,
+    teamAbbr: null,
+    teamLogoUrl: null,
+  }));
+  const before = structuredClone(events);
+  assert.deepEqual(
+    prioritizeHomeActivity(events, "own", "opponent", ["contender"]).map(
+      (event) => event.teamId,
+    ),
+    ["own", "opponent", "contender", "league"],
+  );
+  assert.deepEqual(events, before);
+  assert.deepEqual(
+    prioritizeHomeActivity(events).map((event) => event.id),
+    ["0", "1", "2", "3"],
+  );
+});
+
+void test("matchup progress handles absent schedules and includes the end date", () => {
+  assert.equal(matchupProgress(null, null), null);
+  assert.equal(
+    matchupProgress("2026-11-09", "2026-11-15", Date.parse("2026-11-08")),
+    0,
+  );
+  assert.equal(
+    matchupProgress("2026-11-09", "2026-11-15", Date.parse("2026-11-16")),
+    100,
+  );
+  assert.ok(
+    (matchupProgress("2026-11-09", "2026-11-15", Date.parse("2026-11-15")) ??
+      100) < 100,
+  );
+});
 
 void test("home draft hub appears one week before the draft and hides three days after", () => {
   const startsAt = "2026-10-04T23:00:00Z";

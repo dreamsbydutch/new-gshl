@@ -153,9 +153,7 @@ function MatchupCard({
           height={72}
           className={cn(
             "absolute left-1/2 h-[72px] w-[72px] -translate-x-1/2 object-contain",
-            conferenceLogoPlacement === "above"
-              ? "bottom-full"
-              : "top-full",
+            conferenceLogoPlacement === "above" ? "bottom-full" : "top-full",
           )}
         />
       ) : null}

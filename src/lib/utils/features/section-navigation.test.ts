@@ -48,7 +48,7 @@ void test("news details and NHL matchups keep their league section selected", ()
 
 void test("legacy player tools have one clear owning section", () => {
   for (const [path, search, label] of [
-    ["/players", "", "Research"],
+    ["/players", "", "Stats"],
     ["/leagueoffice", "view=freeAgents", "Free agency"],
     ["/leagueoffice", "view=draft", "Draft classes"],
     ["/leagueoffice/mock-draft", "", "Draft classes"],

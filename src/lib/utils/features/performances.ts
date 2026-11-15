@@ -199,9 +199,15 @@ export function performanceDisplayStats(
   const stats = Object.fromEntries(
     performanceStats(kind).map((stat) => [stat, performanceNumber(row[stat])]),
   );
-  if (kind !== "playerNhl") {
+  // Career records aggregate native season totals; period ratings cannot be
+  // summed into a career rating, so those record projections omit ratings.
+  if (
+    kind !== "playerNhl" &&
+    kind !== "playerCareer" &&
+    kind !== "teamCareer"
+  ) {
     const periods: Record<
-      Exclude<PerformanceKind, "playerNhl">,
+      Exclude<PerformanceKind, "playerNhl" | "playerCareer" | "teamCareer">,
       GshlRatingPeriod
     > = {
       playerDay: "playerDayStatLines",

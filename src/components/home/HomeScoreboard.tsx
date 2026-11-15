@@ -88,7 +88,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                       : matchupPhase === "upcoming"
                         ? "Matchup preview →"
                         : "Week complete"}
-                  </h3>
+                  </h2>
                   <ul
                     aria-label={`Week ${matchupWeek.weekNum} matchups`}
                     className="flex gap-2"

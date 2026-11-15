@@ -4,28 +4,30 @@ import { PageContextNavigation } from "@gshl-nav";
 import { LockerRoomSkeleton } from "@gshl-skeletons";
 import { cn } from "@gshl-utils";
 const sections = [
-  ["overview", "Overview"],
   ["roster", "Roster"],
   ["salary", "Contracts & cap"],
-  ["tradeBlock", "Trades"],
+  ["tradeBlock", "Trade block"],
+  ["draft", "Draft picks"],
   ["history", "History"],
 ] as const;
 const history = [
   ["history", "Matchups"],
   ["trophy", "Trophies"],
   ["recordbook", "Records"],
-  ["draft", "Draft picks"],
 ] as const;
 export function LockerRoomLayout({ children }: { children: React.ReactNode }) {
   const navigation = useLockerRoomContextNavigation();
   const isHistory = history.some(([key]) => key === navigation.selectedView);
   return (
     <>
-      <PageContextNavigation ariaLabel="My Team sections">
+      <PageContextNavigation ariaLabel="Team sections">
         <div className="no-scrollbar mx-auto flex max-w-6xl overflow-x-auto">
           {sections.map(([key, label]) => {
             const active =
-              key === "history" ? isHistory : navigation.selectedView === key;
+              key === "history"
+                ? isHistory
+                : navigation.selectedView === key ||
+                  (key === "roster" && navigation.selectedView === "overview");
             return (
               <button
                 key={key}
@@ -73,7 +75,7 @@ export function LockerRoomLayout({ children }: { children: React.ReactNode }) {
       ) : null}
       <main aria-labelledby="locker-room-page-heading" className="gshl-page">
         <h1 id="locker-room-page-heading" className="sr-only">
-          My Team
+          Team
         </h1>
         {navigation.isReady ? children : <LockerRoomSkeleton />}
       </main>

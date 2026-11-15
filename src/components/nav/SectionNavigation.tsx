@@ -28,7 +28,7 @@ export function SectionNavigation({
 
   return (
     <PageContextNavigation
-      ariaLabel={`${section === "league" ? "League" : "Players"} sections`}
+      ariaLabel={`${section === "league" ? "League" : "Stats and transactions"} sections`}
     >
       <div className="no-scrollbar mx-auto flex max-w-6xl overflow-x-auto">
         {items.map((item) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 import {
   useAuthSession,
@@ -18,7 +18,10 @@ import type {
   OwnerCommandCenterData,
   OwnerCommandCenterMatchup,
 } from "@gshl-lib/types/owner-command-center";
-import { buildOwnerCommandCenterView, getOwnerMatchupPhase } from "@gshl-utils/features/owner-command-center";
+import {
+  buildOwnerCommandCenterView,
+  getOwnerMatchupPhase,
+} from "@gshl-utils/features/owner-command-center";
 import { useDraftPicksByTeams } from "../main/useDraftPick";
 import { useUfaOverview } from "./useUfaData";
 
@@ -111,8 +114,7 @@ export function useOwnerCommandCenter() {
     enabled: isLinkedOwner && Boolean(ownerId),
   });
   const franchises = franchisesQuery.data;
-  const franchise =
-    franchises.find((candidate) => candidate.isActive) ?? franchises[0] ?? null;
+  const franchise = franchises.find((candidate) => candidate.isActive) ?? null;
   const teamsQuery = useTeams({
     franchiseId: franchise?.id,
     enabled: isLinkedOwner && Boolean(franchise?.id),

@@ -6,7 +6,9 @@ import {
   Newspaper,
   Bell,
   ClipboardList,
-  Ellipsis,
+  Menu,
+  Trophy,
+  CalendarDays,
   ShieldCheck,
   ChartNoAxesCombined,
 } from "lucide-react";
@@ -24,13 +26,43 @@ import { cn } from "@gshl-utils";
 
 const moreItems = [
   {
+    label: "League overview",
+    description: "Matchups and playoff picture",
+    href: "/league",
+    icon: Trophy,
+  },
+  {
+    label: "Records",
+    description: "Career, season and weekly leaders",
+    href: "/records",
+    icon: Trophy,
+  },
+  {
+    label: "Free agency",
+    description: "Available players and offers",
+    href: "/leagueoffice?view=freeAgents",
+    icon: ClipboardList,
+  },
+  {
+    label: "Draft hub",
+    description: "Board, draft classes and team picks",
+    href: "/draft",
+    icon: CalendarDays,
+  },
+  {
+    label: "League activity",
+    description: "Transactions and roster moves",
+    href: "/activity",
+    icon: Bell,
+  },
+  {
     label: "NHL Explorer",
     description: "Team talent, player GAR, and contract value",
     href: "/nhl",
     icon: ChartNoAxesCombined,
   },
   {
-    label: "Press Box",
+    label: "League news",
     description: "League news and weekly editions",
     href: "/headlines",
     icon: Newspaper,
@@ -93,20 +125,20 @@ export function MoreNavigationMenu({
               ? "bg-slate-900 text-white"
               : "text-slate-700 hover:bg-slate-100",
             isMobile
-              ? "flex h-full min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-1 py-1 text-[11px] lg:hidden"
+              ? "flex flex-col gap-0 px-2 text-[10px] text-white hover:bg-slate-800 lg:hidden"
               : "hidden px-3 py-2 text-sm lg:flex",
           )}
-          aria-label="Open more navigation"
+          aria-label="Open league menu"
         >
-          <Ellipsis className="h-5 w-5" aria-hidden="true" />
-          <span>More</span>
+          <Menu className="h-5 w-5" aria-hidden="true" />
+          <span>Menu</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        side={isMobile ? "top" : "bottom"}
+        side="bottom"
         align="end"
         sideOffset={isMobile ? 12 : 10}
-        className="z-[70] w-72 p-2"
+        className="z-[70] max-h-[75dvh] w-72 overflow-y-auto p-2"
       >
         <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-slate-500">
           Explore GSHL
