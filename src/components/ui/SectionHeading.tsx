@@ -18,8 +18,12 @@ export function SectionHeading({
         {title}
       </h2>
       {href && action ? (
-        <Link href={href} className="gshl-text-action">
-          {action}
+        <Link
+          href={href}
+          className="gshl-text-action min-w-11 justify-center"
+          aria-label={action}
+          title={action}
+        >
           <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>
       ) : null}

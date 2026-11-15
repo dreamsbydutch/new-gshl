@@ -726,8 +726,13 @@ export const powerRankingsPreview = query({
       : null;
     if (args.weekId && !requestedWeek) return null;
     const today = args.referenceDate ?? utcTimestampToDateKey(Date.now());
+    // Completed weeks keep their own snapshot. Active/upcoming matchups can
+    // use the latest saved rankings when this week's snapshot is not ready.
     const historicalWeek =
-      requestedWeek && utcTimestampToDateKey(requestedWeek.startDate) <= today
+      requestedWeek &&
+      utcTimestampToDateKey(requestedWeek.startDate) <= today &&
+      (!requestedWeek.endDate ||
+        utcTimestampToDateKey(requestedWeek.endDate) < today)
         ? requestedWeek
         : null;
     const eligibleWeeks = args.weekId

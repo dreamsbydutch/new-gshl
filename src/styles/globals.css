@@ -166,10 +166,10 @@
 /* Compact sections own spacing; nested surfaces do not add another gutter. */
 @layer components {
   .gshl-page {
-    @apply mx-auto w-full max-w-6xl px-3 py-2 sm:px-5 sm:py-3;
+    @apply mx-auto w-full max-w-6xl px-2 py-2 sm:px-3;
   }
   .gshl-section {
-    @apply min-w-0 break-inside-avoid border-b border-slate-200 bg-white py-2;
+    @apply min-w-0 break-inside-avoid border-b border-slate-200 bg-white py-1;
   }
   .gshl-section-title {
     @apply text-sm font-bold leading-5 text-slate-950;

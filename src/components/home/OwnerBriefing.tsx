@@ -13,7 +13,7 @@ function TeamMark({ name, logo }: { name: string; logo?: string | null }) {
       alt=""
       width={60}
       height={60}
-      className="h-12 w-12 object-contain sm:h-16 sm:w-16"
+      className="h-10 w-10 object-contain sm:h-12 sm:w-12"
     />
   ) : (
     <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-xl font-bold">
@@ -44,15 +44,13 @@ export function OwnerBriefing({
   const matchup = view.matchup;
   if (!matchup)
     return (
-      <section className="rounded-2xl bg-slate-950 p-5 text-white">
+      <section className="rounded-lg bg-slate-950 p-3 text-white">
         <p className="text-xs uppercase tracking-wider text-slate-400">
           Between matchups
         </p>
         <h2 className="mt-1 text-xl font-bold">{owner.team?.name}</h2>
-        <p className="mt-2 text-sm text-slate-300">
-          Get ready for what comes next.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-4">
+
+        <div className="mt-1 flex flex-wrap gap-2">
           <Link
             href={owner.actions.viewDraftPicks}
             className="inline-flex min-h-11 items-center text-sm font-semibold"
@@ -75,10 +73,10 @@ export function OwnerBriefing({
   return (
     <section
       aria-label="Your matchup"
-      className="overflow-hidden rounded-2xl border-t-4 bg-slate-950 text-white"
+      className="overflow-hidden rounded-lg border-t-2 bg-slate-950 text-white"
       style={{ borderTopColor: palette.primary ?? "#64748b" }}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-xs">
+      <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2 text-xs">
         <span className="font-semibold uppercase tracking-wider">
           {current ? "This week" : "Up next"} · Week {matchup.weekNum ?? "TBD"}
         </span>
@@ -94,10 +92,10 @@ export function OwnerBriefing({
       </div>
       <Link
         href={matchup.href}
-        className="block px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white sm:px-6"
+        className="block px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white sm:px-3"
       >
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-          <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+          <div className="flex min-w-0 flex-col items-center gap-1 text-center">
             <TeamMark
               name={owner.team?.name ?? "Your team"}
               logo={owner.team?.logoUrl}
@@ -107,14 +105,14 @@ export function OwnerBriefing({
             </span>
           </div>
           <div className="text-center">
-            <p className="whitespace-nowrap font-mono text-3xl font-bold tracking-tight sm:text-5xl">
+            <p className="whitespace-nowrap font-mono text-3xl font-bold tracking-tight sm:text-4xl">
               {current ? `${ownScore ?? "–"} : ${opponentScore ?? "–"}` : "VS"}
             </p>
             <span className="mt-1 block text-[10px] uppercase tracking-wider text-slate-400">
               {current ? "Category score" : "Upcoming matchup"}
             </span>
           </div>
-          <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+          <div className="flex min-w-0 flex-col items-center gap-1 text-center">
             <TeamMark
               name={matchup.opponent?.name ?? "Opponent"}
               logo={matchup.opponent?.logoUrl}
@@ -124,7 +122,7 @@ export function OwnerBriefing({
             </span>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+        <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
           <span>
             {matchup.weekStartDate
               ? showDate(matchup.weekStartDate)
@@ -151,7 +149,7 @@ export function OwnerBriefing({
       </Link>
       {current ? (
         <div
-          className="grid grid-cols-2 gap-3 border-t border-white/10 px-4 py-2 text-[10px] text-slate-400"
+          className="grid grid-cols-2 gap-2 border-t border-white/10 px-3 py-1.5 text-[10px] text-slate-400"
           aria-label="Latest recorded change to each team's weekly totals"
         >
           <span>
