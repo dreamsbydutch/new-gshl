@@ -169,7 +169,7 @@
     @apply mx-auto w-full max-w-6xl px-2 py-2 sm:px-3;
   }
   .gshl-section {
-    @apply min-w-0 break-inside-avoid border-b border-slate-200 bg-white py-1;
+    @apply min-w-0 break-inside-avoid rounded-lg border border-slate-200 bg-white p-2;
   }
   .gshl-section-title {
     @apply text-sm font-bold leading-5 text-slate-950;

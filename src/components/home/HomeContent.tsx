@@ -80,7 +80,7 @@ export function HomeContent() {
       ) : null}
       <FreeAgencyNotice />
       {view.season ? (
-        <section>
+        <section className="gshl-section">
           <SectionHeading
             id="home-matchups-heading"
             title={owner ? "Around your league" : "This week's matchups"}
@@ -94,8 +94,11 @@ export function HomeContent() {
           The league schedule will appear when a season is available.
         </p>
       )}
-      <div className="grid min-w-0 items-start gap-3 md:grid-cols-2 md:gap-x-5">
-        <section aria-labelledby="rundown-updates-heading" className="min-w-0">
+      <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
+        <section
+          aria-labelledby="rundown-updates-heading"
+          className="gshl-section"
+        >
           <SectionHeading
             id="rundown-updates-heading"
             title={owner ? "Updates for you" : "League activity"}
@@ -183,7 +186,7 @@ export function HomeContent() {
         </section>
         <div className="min-w-0 space-y-3">
           {view.season ? <StandingsPreview seasonId={view.season.id} /> : null}
-          <section aria-label="League headlines">
+          <section aria-label="League headlines" className="gshl-section">
             <SectionHeading
               id="home-news-heading"
               title="League news"
@@ -194,7 +197,7 @@ export function HomeContent() {
           </section>
         </div>
       </div>
-      <div className="grid min-w-0 items-start gap-3 md:grid-cols-2 md:gap-x-5">
+      <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
         {view.season ? (
           <PowerRankingsHomeCard seasonId={view.season.id} />
         ) : null}

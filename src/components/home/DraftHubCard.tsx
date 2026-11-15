@@ -46,7 +46,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
   return (
     <section
       aria-labelledby="draft-hub-home-heading"
-      className="mx-auto w-full max-w-none border-b border-slate-300 py-2"
+      className="gshl-section mx-auto w-full max-w-none"
     >
       <div className="grid items-center gap-2 md:grid-cols-[1fr_auto]">
         <div className="flex min-w-0 items-start gap-3">

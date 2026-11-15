@@ -9,7 +9,7 @@ export function FreeAgencyNotice() {
   return (
     <section
       aria-label="Free agency is open"
-      className="flex items-center justify-between gap-3 border-b border-slate-300 py-2"
+      className="gshl-section flex items-center justify-between gap-3"
     >
       <span className="text-sm font-semibold">
         <span

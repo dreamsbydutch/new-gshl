@@ -40,7 +40,7 @@ class LineupShameErrorBoundary extends Component<
         <section
           aria-label="Bench of shame"
           role="alert"
-          className="w-full border-t border-slate-200 py-2"
+          className="gshl-section w-full"
         >
           <h2 className="font-oswald text-lg text-slate-950 sm:text-xl">
             Bench of shame
@@ -74,7 +74,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
   return (
     <section
       aria-labelledby="lineup-shame-heading"
-      className="w-full min-w-0 overflow-hidden"
+      className="gshl-section w-full overflow-hidden"
     >
       <header className="flex min-h-11 items-center gap-2 border-b border-slate-200">
         <span className="flex h-6 w-6 shrink-0 items-center justify-center text-rose-600">

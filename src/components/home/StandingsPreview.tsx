@@ -14,7 +14,7 @@ export function StandingsPreview({ seasonId }: { seasonId: string }) {
   const standingsHref =
     "/standings?view=conference&season=" + encodeURIComponent(seasonId);
   return (
-    <section className="min-w-0" aria-labelledby="home-standings-heading">
+    <section className="gshl-section" aria-labelledby="home-standings-heading">
       <SectionHeading
         id="home-standings-heading"
         title="Standings"
@@ -28,12 +28,12 @@ export function StandingsPreview({ seasonId }: { seasonId: string }) {
       ) : !groups.some((group) => group.teams.length) ? (
         <p className="py-2 text-sm text-slate-500">No standings yet.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-5">
+        <div className="mx-auto grid w-full max-w-sm grid-cols-2 gap-x-2">
           {groups.map((group) => (
             <div key={group.title} className="min-w-0">
               <h3
                 title={group.title}
-                className="truncate border-b border-slate-100 py-1 text-xs font-semibold text-slate-500"
+                className="truncate border-b border-slate-100 py-1 text-center text-sm font-semibold text-slate-600"
               >
                 {group.title.replace(/ Conference$/i, "")}
               </h3>
@@ -72,25 +72,25 @@ export function StandingsPreview({ seasonId }: { seasonId: string }) {
                         }
                         title={label}
                         aria-label={label}
-                        className="flex min-h-11 items-center justify-between gap-2 px-1 text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                        className="flex min-h-11 items-center justify-center gap-3 px-1 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
                       >
                         {team.logoUrl ? (
                           <Image
                             src={team.logoUrl}
                             alt=""
-                            width={28}
-                            height={28}
-                            className="h-7 w-7 shrink-0 object-contain"
+                            width={32}
+                            height={32}
+                            className="h-8 w-8 shrink-0 object-contain"
                           />
                         ) : (
                           <span
                             aria-hidden="true"
-                            className="text-xs font-semibold"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center text-xs font-semibold"
                           >
                             {team.abbr ?? teamName.slice(0, 3)}
                           </span>
                         )}
-                        <span className="font-mono text-xs tabular-nums text-slate-700">
+                        <span className="min-w-14 text-center text-base font-semibold tabular-nums text-slate-800">
                           {record}
                         </span>
                       </Link>
