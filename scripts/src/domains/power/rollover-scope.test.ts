@@ -68,3 +68,18 @@ test("the next rollover leaves the currently published Week 5 rankings intact", 
   assert.deepEqual(scoped.weekUpdates, [updates.weekUpdates[1]]);
   assert.deepEqual(scoped.matchupUpdates, [updates.matchupUpdates[1]]);
 });
+
+test("two-week catch-up publishes both missing entering snapshots after the oldest ended week", () => {
+  const weeks = [5, 6, 7, 8].map((weekNum) => ({ id: `w${weekNum}`, weekNum }));
+  const updates = {
+    weekUpdates: weeks.map((w) => ({ weekId: w.id, powerRk: 1 })),
+    matchupUpdates: [],
+  };
+  assert.deepEqual(
+    scopePowerRolloverUpdates("w6", weeks, [], updates).weekUpdates.map(
+      (row) => row.weekId,
+    ),
+    ["w7", "w8"],
+  );
+  assert.equal(updates.weekUpdates.length, 4);
+});

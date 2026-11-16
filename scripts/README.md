@@ -1447,20 +1447,20 @@ Current-roster failures are recorded while independent NHL and historical work
 can finish using stored lineups. Contract/source conflicts require review and
 are never silently accepted.
 
-After the morning recheck succeeds, the cycle closes ended scoring weeks using
+Before unrelated daily roster work, from 03:00 Toronto the cycle provisionally refreshes ended scoring weeks using
 the existing standings and power commands. It checks NHL game completion before
 advancing historical checkpoints, finalizes matchup scores, rebuilds entering-week
 power, refreshes standings/rank tiebreaks, then hands each completed week to the
-Press Box. Failed stages retry on the next daytime cycle; a persisted completion
+Press Box only after noon finalization. Provisional standings/power refresh hourly without freezing stats. Failed stages retry on the next five-minute trigger; a persisted completion
 marker prevents repeating successful weekly work. Catch-up waits until every
-ended week is reconciled because these calculations operate on the whole season.
+ended week has passed its full source recheck because these calculations operate on the whole season. The full-week recheck supplies final-stat readiness independently of the daily morning checkpoint. Every selected date must also have the persisted successful Yahoo roster-capture checkpoint; partially imported dates cannot be frozen.
 Immediately before finalization, the rollover rechecks the entire ended matchup
 once more. Its persisted `weeklyRefreshCompletedAt` marker then freezes player-day
 stats and Yahoo roster imports; subsequent NHL corrections are ignored for that
 week. Merely passing Sunday midnight does not freeze a week before the morning
 handoff succeeds. Standalone rollover accepts `--python-bin` for this final pass.
 Sunday-ending weeks therefore roll over on the first successful Monday run after
-08:00 Toronto. The operator PC must be available; this is not a hosted calculation job.
+03:00 Toronto provisionally, with final reconciliation, stat freeze and newsletter release on the first successful cycle at or after 12:00. The operator PC must be available; this is not a hosted calculation job.
 
 The backend `weeklyEditions:completeWeeklyRefresh` and the week completion field
 must be deployed before applied rollovers can run. A read-only preflight blocks
@@ -1470,7 +1470,7 @@ and writing retries. Season dates also identify current seasons when `isActive`
 is stale. Without a Newsroom key, the handoff uses the existing template generator.
 For a standalone preview, consult
 `src/commands/stats/run-weekly-rollover.ts --help`; it requires explicit production
-configuration and completed morning checkpoint dates. Dry runs preview each
+configuration and an ended-date eligibility boundary; the command rechecks every selected week itself. Dry runs preview each
 calculation against persisted data, so later stages do not include earlier
 unapplied changes; they neither publish nor advance completion markers.
 
@@ -1506,7 +1506,7 @@ stale holistic hockey scores until a new reviewed model is published. See
 
 The Windows installer under `scripts/windows/` defaults to a preview and installs
 an interactive-user five-minute trigger only when explicitly applied. It never
-replaces an existing task. The wrapper skips weekly publication and uses
+replaces an existing task. The wrapper uses
 Node's direct `--import tsx` loader to retain system certificate verification.
 See [refresh cadence](../docs/operations/stat-refresh-cadence.md).
 

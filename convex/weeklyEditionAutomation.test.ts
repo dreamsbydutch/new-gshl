@@ -258,7 +258,11 @@ void test("calendar-current season publishes despite a stale inactive flag", asy
   }
 });
 
-void test("operator handoff enforces authorization, readiness, preview and idempotent publication", async () => {
+void test("operator handoff enforces authorization, readiness, preview and idempotent publication", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: Date.parse("2026-11-16T17:00:00Z"),
+  });
   const previousSecret = process.env.CONVEX_SERVER_SECRET;
   const previousKey = process.env.OPENAI_API_KEY;
   process.env.CONVEX_SERVER_SECRET = "test-only";
@@ -325,6 +329,25 @@ void test("operator handoff enforces authorization, readiness, preview and idemp
       f.rows("weeks").find((row) => row._id === "w")!.weeklyRefreshCompletedAt,
       undefined,
     );
+    t.mock.timers.setTime(Date.parse("2026-11-16T08:00:00Z"));
+    await assert.rejects(
+      invokeMutation(completeWeeklyRefresh, f.ctx, args),
+      /before noon/,
+    );
+    await invokeMutation(completeWeeklyRefresh, f.ctx, {
+      ...args,
+      provisional: true,
+    });
+    assert.equal(f.scheduled.length, 0);
+    assert.equal(
+      f.rows("weeks").find((row) => row._id === "w")!.weeklyRefreshCompletedAt,
+      undefined,
+    );
+    assert.ok(
+      f.rows("weeks").find((row) => row._id === "w")!
+        .weeklyProvisionalCompletedAt,
+    );
+    t.mock.timers.setTime(Date.parse("2026-11-16T17:00:00Z"));
     await invokeMutation(completeWeeklyRefresh, f.ctx, args);
     await invokeMutation(completeWeeklyRefresh, f.ctx, args);
     assert.equal(f.scheduled.length, 1);
@@ -358,7 +381,11 @@ void test("weekly scanner waits for finalized matchups without spending writing 
   }
 });
 
-void test("automatic scanner queues once, leases work, and stops after three failures", async () => {
+void test("automatic scanner leases work and retries exhausted failures after cooldown", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: Date.parse("2026-11-16T17:00:00Z"),
+  });
   const prior = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "test-only";
   try {
@@ -394,6 +421,10 @@ void test("automatic scanner queues once, leases work, and stops after three fai
     }
     assert.equal(f.scheduled.length, 3);
     assert.equal(job.status, "failed");
+    t.mock.timers.tick(60 * 60_000);
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(f.scheduled.length, 4);
+    assert.equal(job.attempts, 4);
     assert.equal(
       await invokeMutation(transitionAutomaticEdition, f.ctx, {
         jobId: job._id,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   allScoringGamesFinished,
+  assertWeeklyRosterCoverage,
   dueWeeklyRollovers,
   runWeeklyRollover,
 } from "./weekly-rollover";
@@ -102,4 +103,61 @@ test("publication follows results, power and standings and never follows a failu
   events.length = 0;
   await runWeeklyRollover(stages, true);
   assert.deepEqual(events, ["standings", "power", "standings", "publish"]);
+});
+
+test("3am provisional rollover stays correctable and retries hourly until noon", () => {
+  const now = Date.parse("2026-10-05T07:00:00Z");
+  const pending = {
+    ...input,
+    morningRecheckOn: undefined,
+    provisional: true,
+    now,
+  };
+  assert.equal(dueWeeklyRollovers(pending).length, 1);
+  const weeks = [{ ...input.weeks[0]!, weeklyProvisionalCompletedAt: now }];
+  assert.equal(dueWeeklyRollovers({ ...pending, weeks }).length, 0);
+  assert.equal(
+    dueWeeklyRollovers({ ...pending, weeks, now: now + 3600000 }).length,
+    1,
+  );
+  assert.equal(dueWeeklyRollovers({ ...input, weeks }).length, 1);
+  assert.equal(
+    dueWeeklyRollovers({ ...pending, reconciledThrough: "2026-10-03" }).length,
+    0,
+  );
+});
+
+test("self-contained full-week reconciliation does not wait behind the daily morning checkpoint", () => {
+  assert.equal(
+    dueWeeklyRollovers({
+      ...input,
+      morningRecheckOn: undefined,
+      fullWeekRecheck: true,
+    }).length,
+    1,
+  );
+  assert.equal(
+    dueWeeklyRollovers({ ...input, morningRecheckOn: undefined }).length,
+    0,
+  );
+});
+
+test("partial Yahoo imports cannot freeze even when every date has NHL rows", () => {
+  const weeks = [{ id: "w", startDate: "2026-11-09", endDate: "2026-11-15" }];
+  const locked = [
+    "2026-11-09",
+    "2026-11-10",
+    "2026-11-11",
+    "2026-11-12",
+    "2026-11-13",
+    "2026-11-14",
+  ];
+  assert.throws(
+    () => assertWeeklyRosterCoverage(weeks, locked),
+    /coverage.*2026-11-15/,
+  );
+  assert.doesNotThrow(() =>
+    assertWeeklyRosterCoverage(weeks, [...locked, "2026-11-15"]),
+  );
+  assert.throws(() => assertWeeklyRosterCoverage(weeks, []), /coverage/);
 });

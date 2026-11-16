@@ -27,8 +27,9 @@ Eliminated playoff teams do not require fabricated roster days.
 The Windows runner has process and task overlap protection and uses the signed-in
 operator's existing Yahoo profile and Convex CLI authentication. It stores no
 credentials in task arguments. The PC must be awake, connected and signed in.
-After final-stat reconciliation, the installed stat task finalizes ended matchups,
-refreshes standings and entering-week power, then releases their Press Box editions.
+From 03:00 Toronto, after the completed-slate checkpoint, the installed stat task refreshes ended matchups, standings and entering-week power hourly while keeping stats correctable. Every selected scoring date must have a successful Yahoo roster-capture checkpoint before weekly work can freeze it. Weekly work runs before unrelated daily roster work and rechecks the full week itself rather than waiting for that daily checkpoint. At or after noon it rechecks final stats and refreshes the full ended week again before persisting the freeze marker and releasing its Press Box edition. Stat and rollover subprocesses allow up to an hour on the operator host; the previous 20-minute limit could repeatedly kill a valid refresh before its checkpoint advanced. Failed work retains eligibility for the next five-minute trigger; late games defer rollover until finished.
+
+For goalie counting discrepancies, league policy is to preserve the current NHL API values rather than infer replacement saves from arithmetic or HTML reports. Exact API tuples and source evidence are recorded in the shared goalie accounting exceptions so imports and aggregation agree.
 Its season calendar is explicit; configure the next season when its weeks exist.
 
 Use the installer script's preview and the commands' help for invocation details.

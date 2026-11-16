@@ -193,7 +193,7 @@ a verification challenge or incomplete directory fails the job rather than
 reporting a successful refresh. It does not enable recurring schedules.
 
 Separate code-defined crons reconcile due UFA groups every 15 minutes and scan
-weekly-edition milestones every six hours.
+weekly-edition milestones every 15 minutes. Weekly editions wait for the operator's noon Toronto finalization marker; provisional rollover begins at 03:00 and remains correctable until that final handoff.
 
 Commissioner contract creation and UFA finalization share
 [`convex/lib/contractSigningTransaction.ts`](../convex/lib/contractSigningTransaction.ts)

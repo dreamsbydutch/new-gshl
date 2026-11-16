@@ -15,6 +15,7 @@ import { refreshOpenWeekStats } from "../../domains/nhl/refresh-open-week-stats"
 import type { DatabaseRecord } from "../../integrations/data/records";
 import {
   allScoringGamesFinished,
+  assertWeeklyRosterCoverage,
   dueWeeklyRollovers,
   runWeeklyRollover,
 } from "../../domains/yahoo/weekly-rollover";
@@ -40,11 +41,12 @@ async function main() {
       "reconciled-through": { type: "string" },
       "morning-recheck-on": { type: "string" },
       "python-bin": { type: "string" },
+      "locked-roster-dates": { type: "string" },
     },
   });
   if (values.help) {
     console.log(
-      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings, then freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
+      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD --locked-roster-dates DATE,DATE [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings, then refreshes provisionally from 03:00 Toronto; at/after noon it freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
     );
     return;
   }
@@ -64,12 +66,13 @@ async function main() {
     parts.find((p) => p.type === key)!.value;
   if (
     !values["allow-outside-window"] &&
-    (Number(part("hour")) < 8 || Number(part("hour")) > 22)
+    (Number(part("hour")) < 3 || Number(part("hour")) > 22)
   ) {
     console.log("Outside the daytime window; no weekly work applied.");
     return;
   }
   const today = `${part("year")}-${part("month")}-${part("day")}`;
+  const provisional = Number(part("hour")) < 12;
   console.log("[weekly-rollover] Loading season and completion checkpoints.");
   const seasons = await fetchModel<Record<string, unknown>>("Season");
   const season = seasons.find((row) =>
@@ -84,12 +87,18 @@ async function main() {
   );
   const due = dueWeeklyRollovers({
     today,
+    provisional,
+    now: Date.now(),
+    // This command verifies final game states and re-fetches every ended day itself.
+    fullWeekRecheck: true,
     reconciledThrough: values["reconciled-through"],
     morningRecheckOn: values["morning-recheck-on"],
     weeks: weeks.map((row) => ({
       id: String(row.id),
       startDate: dateKey(row.startDate),
       endDate: dateKey(row.endDate),
+      weeklyProvisionalCompletedAt:
+        Number(row.weeklyProvisionalCompletedAt) || undefined,
       weeklyRefreshCompletedAt:
         Number(row.weeklyRefreshCompletedAt) || undefined,
     })),
@@ -98,6 +107,10 @@ async function main() {
     console.log("No weekly rollover due.");
     return;
   }
+  assertWeeklyRosterCoverage(
+    due,
+    (values["locked-roster-dates"] ?? "").split(",").filter(Boolean),
+  );
   // Standings rebuilds the whole season, so validate every pending week first.
   console.log(
     "[weekly-rollover] Validating ended-week matchups and aggregates.",
@@ -142,7 +155,8 @@ async function main() {
       process.execPath,
       [
         "--use-system-ca",
-        path.join(root, "node_modules/tsx/dist/cli.mjs"),
+        "--import",
+        "tsx",
         path.join(root, "scripts/src/commands", command),
         "--season-id",
         seasonId,
@@ -153,7 +167,7 @@ async function main() {
         cwd: path.join(root, "scripts"),
         encoding: "utf8",
         windowsHide: true,
-        timeout: 20 * 60_000,
+        timeout: 60 * 60_000,
         maxBuffer: 8 * 1024 * 1024,
       },
     );
@@ -174,6 +188,7 @@ async function main() {
         seasonId,
         weekId: week.id,
         preflight: true,
+        provisional,
       });
   }
   console.log(
@@ -204,7 +219,8 @@ async function main() {
       power: async () => {
         run("power/rebuild-power-ratings.ts", [
           "--after-week-id",
-          due.at(-1)!.id,
+          // Catch up every missing entering snapshot, preserving ranks through the oldest ended week.
+          due[0]!.id,
         ]);
       },
       publish: async () => {
@@ -214,6 +230,7 @@ async function main() {
             seasonId,
             weekId: week.id,
             apply: true,
+            provisional,
           });
       },
     },

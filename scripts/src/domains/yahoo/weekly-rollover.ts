@@ -1,8 +1,11 @@
+import { shiftYahooDate } from "./sync-cycle";
+
 export type RolloverWeek = {
   id: string;
   startDate: string;
   endDate: string;
   weeklyRefreshCompletedAt?: number;
+  weeklyProvisionalCompletedAt?: number;
 };
 
 /** Runs after the morning reconciliation, including catch-up after downtime. */
@@ -11,8 +14,16 @@ export function dueWeeklyRollovers(input: {
   reconciledThrough?: string;
   morningRecheckOn?: string;
   weeks: RolloverWeek[];
+  provisional?: boolean;
+  now?: number;
+  fullWeekRecheck?: boolean;
 }) {
-  if (input.morningRecheckOn !== input.today || !input.reconciledThrough)
+  if (
+    (!input.fullWeekRecheck &&
+      !input.provisional &&
+      input.morningRecheckOn !== input.today) ||
+    !input.reconciledThrough
+  )
     return [];
   // The existing standings/power commands operate on the whole season.
   // Do not finalize a newer ended week while catch-up still trails it.
@@ -27,6 +38,11 @@ export function dueWeeklyRollovers(input: {
     .filter(
       (week) =>
         !week.weeklyRefreshCompletedAt &&
+        (!input.provisional ||
+          !week.weeklyProvisionalCompletedAt ||
+          (input.now !== undefined &&
+            Math.floor(input.now / 3_600_000) >
+              Math.floor(week.weeklyProvisionalCompletedAt / 3_600_000))) &&
         week.endDate < input.today &&
         week.endDate <= input.reconciledThrough!,
     )
@@ -57,4 +73,24 @@ export async function runWeeklyRollover(
   // Rank tiebreaks and matchup rank snapshots use the newly persisted power.
   await stages.standings();
   if (apply) await stages.publish();
+}
+
+/** A successful, complete Yahoo capture must precede freezing any selected day. */
+export function assertWeeklyRosterCoverage(
+  weeks: RolloverWeek[],
+  lockedDates: readonly string[],
+) {
+  const covered = new Set(lockedDates);
+  for (const week of weeks) {
+    for (
+      let date = week.startDate;
+      date <= week.endDate;
+      date = shiftYahooDate(date, 1)
+    ) {
+      if (!covered.has(date))
+        throw new Error(
+          `Yahoo roster coverage is not complete for ${date}; reconcile historical rosters before weekly finalization`,
+        );
+    }
+  }
 }

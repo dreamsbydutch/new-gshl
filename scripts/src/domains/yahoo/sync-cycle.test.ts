@@ -385,3 +385,27 @@ test("NHL overnight totals continue after the fantasy scoring season ends", () =
   assert.equal(plan.nightlyDate, "2027-04-15");
   assert.equal(plan.windowOpen, true);
 });
+
+test("rollover starts at 3am Toronto and final reconciliation waits until noon across DST", () => {
+  for (const [before, overnight, morning, noon] of [
+    [
+      "2026-10-05T06:59:00Z",
+      "2026-10-05T07:00:00Z",
+      "2026-10-05T12:00:00Z",
+      "2026-10-05T16:00:00Z",
+    ],
+    [
+      "2027-01-04T07:59:00Z",
+      "2027-01-04T08:00:00Z",
+      "2027-01-04T13:00:00Z",
+      "2027-01-04T17:00:00Z",
+    ],
+  ]) {
+    const plan = (at: string) =>
+      planYahooSyncCycle({ ...scope, now: new Date(at), checkpoint: {} });
+    assert.equal(plan(before!).weeklyWindow, false);
+    assert.equal(plan(overnight!).weeklyWindow, true);
+    assert.equal(plan(morning!).morning, false);
+    assert.equal(plan(noon!).morning, true);
+  }
+});

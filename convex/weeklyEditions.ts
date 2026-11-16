@@ -3094,6 +3094,7 @@ export const completeWeeklyRefresh = mutation({
     weekId: v.id("weeks"),
     apply: v.optional(v.boolean()),
     preflight: v.optional(v.boolean()),
+    provisional: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     if (
@@ -3115,6 +3116,17 @@ export const completeWeeklyRefresh = mutation({
     }).format(Date.now());
     if (!dateKey(week.endDate) || dateKey(week.endDate) >= today)
       throw new Error("The selected week has not ended");
+    const localHour = Number(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Toronto",
+        hour: "2-digit",
+        hourCycle: "h23",
+      }).format(Date.now()),
+    );
+    if (!args.provisional && localHour < 12)
+      throw new Error(
+        "Weekly stats cannot be finalized before noon Toronto time",
+      );
     if (args.preflight) {
       if (args.apply) throw new Error("Preflight cannot apply changes");
       return { ready: false, applied: false };
@@ -3164,6 +3176,12 @@ export const completeWeeklyRefresh = mutation({
     )
       throw new Error("Power rankings and standings are not ready");
     if (!args.apply) return { ready: true, applied: false };
+    if (args.provisional) {
+      await ctx.db.patch(week._id, {
+        weeklyProvisionalCompletedAt: Date.now(),
+      });
+      return { ready: true, applied: true };
+    }
     if (!week.weeklyRefreshCompletedAt) {
       await ctx.db.patch(week._id, { weeklyRefreshCompletedAt: Date.now() });
     }
@@ -3324,7 +3342,9 @@ async function queueAutomaticEdition(
   const now = Date.now();
   if (
     job &&
-    (job.status === "succeeded" || job.attempts >= 3 || job.leaseUntil > now)
+    (job.status === "succeeded" ||
+      (job.attempts >= 3 && job.updatedAt > now - 60 * 60_000) ||
+      job.leaseUntil > now)
   )
     return false;
   const existing = await ctx.db
