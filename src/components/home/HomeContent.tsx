@@ -2,14 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  Bell,
-  ChevronRight,
-  Plus,
-  Minus,
-  ArrowLeftRight,
-} from "lucide-react";
+import { Bell, ChevronRight, Plus, Minus, ArrowLeftRight } from "lucide-react";
 import { useHomeDashboard } from "@gshl-hooks/features/useHomeDashboard";
 import { HomeSkeleton } from "@gshl-skeletons";
 import { showDate } from "@gshl-utils";
@@ -33,26 +26,18 @@ export function HomeContent() {
       aria-labelledby="home-dashboard-heading"
       className="gshl-page space-y-3"
     >
-      <header className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            {view.season?.name ?? "Gem Stone Hockey League"}
+      <div className="min-w-0">
+        <h1 id="home-dashboard-heading" className="sr-only">
+          GSHL home
+        </h1>
+        {view.season ? (
+          <HomeScoreboard seasonId={view.season.id} />
+        ) : (
+          <p className="py-4 text-sm text-slate-500">
+            The league schedule will appear when a season is available.
           </p>
-          <h1
-            id="home-dashboard-heading"
-            className="text-xl font-bold tracking-tight text-slate-950"
-          >
-            {owner ? "Your daily rundown" : "Around the GSHL"}
-          </h1>
-        </div>
-        <Link
-          href={owner?.actions.viewRoster ?? "/teams"}
-          className="gshl-text-action"
-        >
-          {owner ? "My team" : "All teams"}
-          <ArrowUpRight className="h-4 w-4" />
-        </Link>
-      </header>
+        )}
+      </div>
       {view.attention.length ? (
         <section
           aria-label="Needs attention"
@@ -79,21 +64,6 @@ export function HomeContent() {
         <DraftHubCard season={view.draftSeason} />
       ) : null}
       <FreeAgencyNotice />
-      {view.season ? (
-        <section className="gshl-section">
-          <SectionHeading
-            id="home-matchups-heading"
-            title={owner ? "Around your league" : "This week's matchups"}
-            href="/schedule?view=week"
-            action="All matchups"
-          />
-          <HomeScoreboard seasonId={view.season.id} />
-        </section>
-      ) : (
-        <p className="py-4 text-sm text-slate-500">
-          The league schedule will appear when a season is available.
-        </p>
-      )}
       <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
         <section
           aria-labelledby="rundown-updates-heading"

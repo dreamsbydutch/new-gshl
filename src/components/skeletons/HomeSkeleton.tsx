@@ -119,16 +119,19 @@ export function HomeSkeleton() {
     <main
       aria-label="Loading GSHL league dashboard"
       aria-busy="true"
-      className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-5"
+      className="gshl-page"
     >
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
-        <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
-          <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-2.5 w-36 max-w-full" />
-            <Skeleton className="h-4 w-72 max-w-[90%]" />
+        <section
+          aria-label="Loading GSHL matchups"
+          className="min-w-0 overflow-hidden"
+        >
+          <Skeleton className="mb-1 h-4 w-36" />
+          <div className="flex gap-2">
+            {[0, 1, 2, 3, 4, 5].map((item) => (
+              <Skeleton key={item} className="h-20 w-24 shrink-0 rounded" />
+            ))}
           </div>
-          <Skeleton className="h-11 w-20 shrink-0 rounded-full" />
         </section>
         <UfaHomeCardSkeleton />
         <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 lg:grid-cols-2">
