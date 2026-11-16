@@ -9,6 +9,7 @@ export interface WeeklyScheduleMatchupSummary {
   awayScore: number | null;
   homeWin: boolean | null;
   awayWin: boolean | null;
+  isComplete: boolean;
 }
 
 export interface WeeklyScheduleTeamSummary {
