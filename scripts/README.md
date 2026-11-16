@@ -1447,13 +1447,13 @@ Current-roster failures are recorded while independent NHL and historical work
 can finish using stored lineups. Contract/source conflicts require review and
 are never silently accepted.
 
-From 03:00 Toronto, the cycle provisionally refreshes ended scoring weeks using
+Before unrelated daily roster work, from 03:00 Toronto the cycle provisionally refreshes ended scoring weeks using
 the existing standings and power commands. It checks NHL game completion before
 advancing historical checkpoints, finalizes matchup scores, rebuilds entering-week
 power, refreshes standings/rank tiebreaks, then hands each completed week to the
 Press Box only after noon finalization. Provisional standings/power refresh hourly without freezing stats. Failed stages retry on the next five-minute trigger; a persisted completion
 marker prevents repeating successful weekly work. Catch-up waits until every
-ended week is reconciled because these calculations operate on the whole season.
+ended week has passed its full source recheck because these calculations operate on the whole season. The full-week recheck supplies final-stat readiness independently of the daily morning checkpoint. Every selected date must also have the persisted successful Yahoo roster-capture checkpoint; partially imported dates cannot be frozen.
 Immediately before finalization, the rollover rechecks the entire ended matchup
 once more. Its persisted `weeklyRefreshCompletedAt` marker then freezes player-day
 stats and Yahoo roster imports; subsequent NHL corrections are ignored for that
@@ -1470,7 +1470,7 @@ and writing retries. Season dates also identify current seasons when `isActive`
 is stale. Without a Newsroom key, the handoff uses the existing template generator.
 For a standalone preview, consult
 `src/commands/stats/run-weekly-rollover.ts --help`; it requires explicit production
-configuration and completed reconciliation checkpoint dates. Dry runs preview each
+configuration and an ended-date eligibility boundary; the command rechecks every selected week itself. Dry runs preview each
 calculation against persisted data, so later stages do not include earlier
 unapplied changes; they neither publish nor advance completion markers.
 

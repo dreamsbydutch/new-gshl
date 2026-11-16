@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
   planYahooSyncCycle,
+  shiftYahooDate,
   type YahooSyncCheckpoint,
 } from "../../domains/yahoo/sync-cycle";
 import { fetchDailyGameStatus } from "../../integrations/nhl/daily-game-status";
@@ -307,7 +308,7 @@ async function main() {
         {
           cwd: path.join(root, "scripts"),
           encoding: "utf8",
-          timeout: 20 * 60 * 1000,
+          timeout: 60 * 60 * 1000,
           maxBuffer: 8 * 1024 * 1024,
           windowsHide: true,
           env: {
@@ -327,6 +328,61 @@ async function main() {
       return true;
     };
     const failures: string[] = [];
+    if (
+      plan.weeklyWindow &&
+      !plan.liveGames &&
+      !values["skip-weekly-rollover"]
+    ) {
+      // Weekly source reconciliation is self-contained; daily Yahoo work must not starve it.
+      try {
+        const weekly = spawnSync(
+          process.execPath,
+          [
+            "--use-system-ca",
+            "--dns-result-order=ipv4first",
+            "--import",
+            "tsx",
+            path.join(
+              root,
+              "scripts/src/commands/stats/run-weekly-rollover.ts",
+            ),
+            "--season-id",
+            seasonId,
+            "--reconciled-through",
+            shiftYahooDate(plan.today, -1),
+            "--locked-roster-dates",
+            (checkpoint.lockedRosterDates ?? []).join(","),
+            "--morning-recheck-on",
+            checkpoint.morningRecheckOn ?? "pending",
+            "--python-bin",
+            values["python-bin"] ?? "python",
+            ...(values.apply ? ["--apply"] : []),
+          ],
+          {
+            cwd: path.join(root, "scripts"),
+            encoding: "utf8",
+            windowsHide: true,
+            timeout: 60 * 60_000,
+            maxBuffer: 8 * 1024 * 1024,
+            env: {
+              ...process.env,
+              GSHL_CONVEX_TARGET: "production",
+              CONVEX_PROD_URL: `https://${deployment}.convex.cloud`,
+              CONVEX_SERVER_SECRET: secret,
+            },
+          },
+        );
+        if (weekly.stdout) log(weekly.stdout);
+        if (weekly.stderr) log(weekly.stderr);
+        if (weekly.status !== 0)
+          throw new Error("Weekly rollover failed; it will retry next cycle.");
+      } catch (error) {
+        failures.push(
+          error instanceof Error ? error.message : "Weekly rollover failed.",
+        );
+      }
+    }
+
     if (plan.scrapeYahoo) {
       try {
         run(plan.today, [
@@ -490,52 +546,6 @@ async function main() {
         throw new Error(
           "Full-matchup correction refresh deferred; rollover must wait.",
         );
-    }
-    if (
-      plan.weeklyWindow &&
-      !plan.liveGames &&
-      !values["skip-weekly-rollover"] &&
-      (checkpoint.reconciledThrough || checkpoint.nightlyCompletedThrough)
-    ) {
-      const weekly = spawnSync(
-        process.execPath,
-        [
-          "--use-system-ca",
-          "--dns-result-order=ipv4first",
-          "--import",
-          "tsx",
-          path.join(root, "scripts/src/commands/stats/run-weekly-rollover.ts"),
-          "--season-id",
-          seasonId,
-          "--reconciled-through",
-          [checkpoint.reconciledThrough, checkpoint.nightlyCompletedThrough]
-            .filter((date): date is string => !!date)
-            .sort()
-            .at(-1)!,
-          "--morning-recheck-on",
-          checkpoint.morningRecheckOn ?? "pending",
-          "--python-bin",
-          values["python-bin"] ?? "python",
-          ...(values.apply ? ["--apply"] : []),
-        ],
-        {
-          cwd: path.join(root, "scripts"),
-          encoding: "utf8",
-          windowsHide: true,
-          timeout: 60 * 60_000,
-          maxBuffer: 8 * 1024 * 1024,
-          env: {
-            ...process.env,
-            GSHL_CONVEX_TARGET: "production",
-            CONVEX_PROD_URL: `https://${deployment}.convex.cloud`,
-            CONVEX_SERVER_SECRET: secret,
-          },
-        },
-      );
-      if (weekly.stdout) log(weekly.stdout);
-      if (weekly.stderr) log(weekly.stderr);
-      if (weekly.status !== 0)
-        throw new Error("Weekly rollover failed; it will retry next cycle.");
     }
     fs.writeFileSync(
       statusPath,

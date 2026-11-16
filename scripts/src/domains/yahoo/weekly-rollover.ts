@@ -1,3 +1,5 @@
+import { shiftYahooDate } from "./sync-cycle";
+
 export type RolloverWeek = {
   id: string;
   startDate: string;
@@ -14,9 +16,12 @@ export function dueWeeklyRollovers(input: {
   weeks: RolloverWeek[];
   provisional?: boolean;
   now?: number;
+  fullWeekRecheck?: boolean;
 }) {
   if (
-    (!input.provisional && input.morningRecheckOn !== input.today) ||
+    (!input.fullWeekRecheck &&
+      !input.provisional &&
+      input.morningRecheckOn !== input.today) ||
     !input.reconciledThrough
   )
     return [];
@@ -68,4 +73,24 @@ export async function runWeeklyRollover(
   // Rank tiebreaks and matchup rank snapshots use the newly persisted power.
   await stages.standings();
   if (apply) await stages.publish();
+}
+
+/** A successful, complete Yahoo capture must precede freezing any selected day. */
+export function assertWeeklyRosterCoverage(
+  weeks: RolloverWeek[],
+  lockedDates: readonly string[],
+) {
+  const covered = new Set(lockedDates);
+  for (const week of weeks) {
+    for (
+      let date = week.startDate;
+      date <= week.endDate;
+      date = shiftYahooDate(date, 1)
+    ) {
+      if (!covered.has(date))
+        throw new Error(
+          `Yahoo roster coverage is not complete for ${date}; reconcile historical rosters before weekly finalization`,
+        );
+    }
+  }
 }

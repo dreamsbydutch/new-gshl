@@ -15,6 +15,7 @@ import { refreshOpenWeekStats } from "../../domains/nhl/refresh-open-week-stats"
 import type { DatabaseRecord } from "../../integrations/data/records";
 import {
   allScoringGamesFinished,
+  assertWeeklyRosterCoverage,
   dueWeeklyRollovers,
   runWeeklyRollover,
 } from "../../domains/yahoo/weekly-rollover";
@@ -40,11 +41,12 @@ async function main() {
       "reconciled-through": { type: "string" },
       "morning-recheck-on": { type: "string" },
       "python-bin": { type: "string" },
+      "locked-roster-dates": { type: "string" },
     },
   });
   if (values.help) {
     console.log(
-      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings, then refreshes provisionally from 03:00 Toronto; at/after noon it freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
+      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD --locked-roster-dates DATE,DATE [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings, then refreshes provisionally from 03:00 Toronto; at/after noon it freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
     );
     return;
   }
@@ -87,6 +89,8 @@ async function main() {
     today,
     provisional,
     now: Date.now(),
+    // This command verifies final game states and re-fetches every ended day itself.
+    fullWeekRecheck: true,
     reconciledThrough: values["reconciled-through"],
     morningRecheckOn: values["morning-recheck-on"],
     weeks: weeks.map((row) => ({
@@ -103,6 +107,10 @@ async function main() {
     console.log("No weekly rollover due.");
     return;
   }
+  assertWeeklyRosterCoverage(
+    due,
+    (values["locked-roster-dates"] ?? "").split(",").filter(Boolean),
+  );
   // Standings rebuilds the whole season, so validate every pending week first.
   console.log(
     "[weekly-rollover] Validating ended-week matchups and aggregates.",
@@ -159,7 +167,7 @@ async function main() {
         cwd: path.join(root, "scripts"),
         encoding: "utf8",
         windowsHide: true,
-        timeout: 20 * 60_000,
+        timeout: 60 * 60_000,
         maxBuffer: 8 * 1024 * 1024,
       },
     );

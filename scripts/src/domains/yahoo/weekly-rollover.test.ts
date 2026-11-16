@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   allScoringGamesFinished,
+  assertWeeklyRosterCoverage,
   dueWeeklyRollovers,
   runWeeklyRollover,
 } from "./weekly-rollover";
@@ -124,4 +125,39 @@ test("3am provisional rollover stays correctable and retries hourly until noon",
     dueWeeklyRollovers({ ...pending, reconciledThrough: "2026-10-03" }).length,
     0,
   );
+});
+
+test("self-contained full-week reconciliation does not wait behind the daily morning checkpoint", () => {
+  assert.equal(
+    dueWeeklyRollovers({
+      ...input,
+      morningRecheckOn: undefined,
+      fullWeekRecheck: true,
+    }).length,
+    1,
+  );
+  assert.equal(
+    dueWeeklyRollovers({ ...input, morningRecheckOn: undefined }).length,
+    0,
+  );
+});
+
+test("partial Yahoo imports cannot freeze even when every date has NHL rows", () => {
+  const weeks = [{ id: "w", startDate: "2026-11-09", endDate: "2026-11-15" }];
+  const locked = [
+    "2026-11-09",
+    "2026-11-10",
+    "2026-11-11",
+    "2026-11-12",
+    "2026-11-13",
+    "2026-11-14",
+  ];
+  assert.throws(
+    () => assertWeeklyRosterCoverage(weeks, locked),
+    /coverage.*2026-11-15/,
+  );
+  assert.doesNotThrow(() =>
+    assertWeeklyRosterCoverage(weeks, [...locked, "2026-11-15"]),
+  );
+  assert.throws(() => assertWeeklyRosterCoverage(weeks, []), /coverage/);
 });
