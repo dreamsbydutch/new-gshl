@@ -220,9 +220,10 @@ async function main() {
         !plan.nightlyDate &&
         !plan.historyDates.length &&
         (values["skip-weekly-rollover"] ||
-          !plan.morning ||
-          checkpoint.morningRecheckOn !== plan.today ||
-          !checkpoint.reconciledThrough))
+          !plan.weeklyWindow ||
+          !(
+            checkpoint.reconciledThrough || checkpoint.nightlyCompletedThrough
+          )))
     ) {
       log("Outside sync hours or no work due; no Yahoo/NHL requests.");
       fs.writeFileSync(
@@ -247,7 +248,9 @@ async function main() {
         [
           "--use-system-ca",
           path.join(
-            path.dirname(fileURLToPath(import.meta.resolve("convex/package.json"))),
+            path.dirname(
+              fileURLToPath(import.meta.resolve("convex/package.json")),
+            ),
             "bin/main.js",
           ),
           "env",
@@ -489,11 +492,10 @@ async function main() {
         );
     }
     if (
-      plan.morning &&
+      plan.weeklyWindow &&
       !plan.liveGames &&
       !values["skip-weekly-rollover"] &&
-      checkpoint.morningRecheckOn === plan.today &&
-      checkpoint.reconciledThrough
+      (checkpoint.reconciledThrough || checkpoint.nightlyCompletedThrough)
     ) {
       const weekly = spawnSync(
         process.execPath,
@@ -506,9 +508,12 @@ async function main() {
           "--season-id",
           seasonId,
           "--reconciled-through",
-          checkpoint.reconciledThrough,
+          [checkpoint.reconciledThrough, checkpoint.nightlyCompletedThrough]
+            .filter((date): date is string => !!date)
+            .sort()
+            .at(-1)!,
           "--morning-recheck-on",
-          checkpoint.morningRecheckOn,
+          checkpoint.morningRecheckOn ?? "pending",
           "--python-bin",
           values["python-bin"] ?? "python",
           ...(values.apply ? ["--apply"] : []),

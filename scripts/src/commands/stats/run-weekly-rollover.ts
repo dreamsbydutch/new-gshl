@@ -44,7 +44,7 @@ async function main() {
   });
   if (values.help) {
     console.log(
-      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings, then freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
+      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings, then refreshes provisionally from 03:00 Toronto; at/after noon it freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
     );
     return;
   }
@@ -64,12 +64,13 @@ async function main() {
     parts.find((p) => p.type === key)!.value;
   if (
     !values["allow-outside-window"] &&
-    (Number(part("hour")) < 8 || Number(part("hour")) > 22)
+    (Number(part("hour")) < 3 || Number(part("hour")) > 22)
   ) {
     console.log("Outside the daytime window; no weekly work applied.");
     return;
   }
   const today = `${part("year")}-${part("month")}-${part("day")}`;
+  const provisional = Number(part("hour")) < 12;
   console.log("[weekly-rollover] Loading season and completion checkpoints.");
   const seasons = await fetchModel<Record<string, unknown>>("Season");
   const season = seasons.find((row) =>
@@ -84,12 +85,16 @@ async function main() {
   );
   const due = dueWeeklyRollovers({
     today,
+    provisional,
+    now: Date.now(),
     reconciledThrough: values["reconciled-through"],
     morningRecheckOn: values["morning-recheck-on"],
     weeks: weeks.map((row) => ({
       id: String(row.id),
       startDate: dateKey(row.startDate),
       endDate: dateKey(row.endDate),
+      weeklyProvisionalCompletedAt:
+        Number(row.weeklyProvisionalCompletedAt) || undefined,
       weeklyRefreshCompletedAt:
         Number(row.weeklyRefreshCompletedAt) || undefined,
     })),
@@ -142,7 +147,8 @@ async function main() {
       process.execPath,
       [
         "--use-system-ca",
-        path.join(root, "node_modules/tsx/dist/cli.mjs"),
+        "--import",
+        "tsx",
         path.join(root, "scripts/src/commands", command),
         "--season-id",
         seasonId,
@@ -174,6 +180,7 @@ async function main() {
         seasonId,
         weekId: week.id,
         preflight: true,
+        provisional,
       });
   }
   console.log(
@@ -214,6 +221,7 @@ async function main() {
             seasonId,
             weekId: week.id,
             apply: true,
+            provisional,
           });
       },
     },

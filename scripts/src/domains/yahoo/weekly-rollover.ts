@@ -3,6 +3,7 @@ export type RolloverWeek = {
   startDate: string;
   endDate: string;
   weeklyRefreshCompletedAt?: number;
+  weeklyProvisionalCompletedAt?: number;
 };
 
 /** Runs after the morning reconciliation, including catch-up after downtime. */
@@ -11,8 +12,13 @@ export function dueWeeklyRollovers(input: {
   reconciledThrough?: string;
   morningRecheckOn?: string;
   weeks: RolloverWeek[];
+  provisional?: boolean;
+  now?: number;
 }) {
-  if (input.morningRecheckOn !== input.today || !input.reconciledThrough)
+  if (
+    (!input.provisional && input.morningRecheckOn !== input.today) ||
+    !input.reconciledThrough
+  )
     return [];
   // The existing standings/power commands operate on the whole season.
   // Do not finalize a newer ended week while catch-up still trails it.
@@ -27,6 +33,11 @@ export function dueWeeklyRollovers(input: {
     .filter(
       (week) =>
         !week.weeklyRefreshCompletedAt &&
+        (!input.provisional ||
+          !week.weeklyProvisionalCompletedAt ||
+          (input.now !== undefined &&
+            Math.floor(input.now / 3_600_000) >
+              Math.floor(week.weeklyProvisionalCompletedAt / 3_600_000))) &&
         week.endDate < input.today &&
         week.endDate <= input.reconciledThrough!,
     )

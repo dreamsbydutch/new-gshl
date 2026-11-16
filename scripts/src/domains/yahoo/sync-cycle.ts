@@ -71,7 +71,9 @@ export function planYahooSyncCycle(input: {
     )
       ? nightlyTarget
       : null;
-  const windowOpen = daytime || overnight || liveGames || !!nightlyDate;
+  const weeklyWindow = hour >= 3 && hour <= 22;
+  const windowOpen =
+    daytime || overnight || liveGames || !!nightlyDate || weeklyWindow;
   // Midnight does not end the previous evening's NHL slate.
   const nhlDate = hour < 4 ? shiftYahooDate(today, -1) : today;
   const nhlActive = input.startDate <= nhlDate && nhlDate <= input.endDate;
@@ -137,6 +139,7 @@ export function planYahooSyncCycle(input: {
     refreshNhl,
     historyDates: daytime && !liveGames ? [...dates].sort() : [],
     recent,
-    morning: daytime,
+    morning: daytime && hour >= 12,
+    weeklyWindow,
   };
 }

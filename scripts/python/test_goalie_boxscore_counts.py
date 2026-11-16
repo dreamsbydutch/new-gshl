@@ -41,6 +41,15 @@ class GoalieBoxscoreCountsTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 reconcile_goalie_counts(row, {**context, key: "wrong"})
 
+    def test_vladar_api_counts_are_preserved_for_the_exact_game(self):
+        row = {"playerId": 8478435, "shotsAgainst": 19, "saves": 16,
+               "goalsAgainst": 4, "toi": "58:15", "decision": "L"}
+        context = {"date": "2026-11-15", "gameId": 2026020326,
+                   "team": "PHI", "opponent": "EDM"}
+        self.assertEqual(reconcile_goalie_counts(row, context), (19, 16, 4))
+        with self.assertRaises(ValueError):
+            reconcile_goalie_counts(row, {**context, "gameId": 2026020327})
+
     def test_consistent_native_counts_are_preserved_without_fallback_fields(self):
         self.assertEqual(reconcile_goalie_counts({"shotsAgainst": 30, "saves": 24,
                                                   "goalsAgainst": 6}), (30, 24, 6))

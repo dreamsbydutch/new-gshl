@@ -103,3 +103,25 @@ test("publication follows results, power and standings and never follows a failu
   await runWeeklyRollover(stages, true);
   assert.deepEqual(events, ["standings", "power", "standings", "publish"]);
 });
+
+test("3am provisional rollover stays correctable and retries hourly until noon", () => {
+  const now = Date.parse("2026-10-05T07:00:00Z");
+  const pending = {
+    ...input,
+    morningRecheckOn: undefined,
+    provisional: true,
+    now,
+  };
+  assert.equal(dueWeeklyRollovers(pending).length, 1);
+  const weeks = [{ ...input.weeks[0]!, weeklyProvisionalCompletedAt: now }];
+  assert.equal(dueWeeklyRollovers({ ...pending, weeks }).length, 0);
+  assert.equal(
+    dueWeeklyRollovers({ ...pending, weeks, now: now + 3600000 }).length,
+    1,
+  );
+  assert.equal(dueWeeklyRollovers({ ...input, weeks }).length, 1);
+  assert.equal(
+    dueWeeklyRollovers({ ...pending, reconciledThrough: "2026-10-03" }).length,
+    0,
+  );
+});
