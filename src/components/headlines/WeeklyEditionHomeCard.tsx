@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { createPortal } from "react-dom";
-import { ArrowRight, BookOpen, X } from "lucide-react";
+import { BookOpen, X } from "lucide-react";
 import { useLatestWeeklyEdition, useWeeklyEdition } from "@gshl-hooks";
 import { Skeleton } from "@gshl-ui";
 import { WEEKLY_EDITION_LOGO_URL } from "@gshl-utils";
@@ -107,14 +106,15 @@ export function WeeklyEditionHomeCard() {
 
   return (
     <>
-      <section className="mx-auto flex w-full max-w-none items-stretch overflow-hidden border-b border-slate-200 bg-white text-slate-950">
+      <section className="mx-auto w-full min-w-0 bg-white text-slate-950">
         <button
           ref={triggerRef}
           type="button"
+          title={edition.headline}
           onClick={() => setIsOpen(true)}
-          className="group flex min-w-0 flex-1 items-center gap-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500"
+          className="group relative flex min-h-11 w-full min-w-0 items-center gap-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded bg-white">
             <Image
               src={WEEKLY_EDITION_LOGO_URL}
               alt=""
@@ -124,47 +124,22 @@ export function WeeklyEditionHomeCard() {
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               Press Box
               <span className="text-slate-400">·</span>
               <span className="truncate text-slate-500">
                 {edition.issueLabel}
               </span>
             </span>
-            <span className="mt-0.5 block truncate text-sm font-semibold leading-5 text-slate-950">
+            <span className="mt-0.5 line-clamp-2 text-sm font-semibold leading-5 text-slate-950">
               {edition.headline}
             </span>
           </span>
-          {edition.heroTeams.length > 0 ? (
-            <span className="hidden shrink-0 items-center -space-x-1 sm:flex">
-              {edition.heroTeams.map((team) => (
-                <span
-                  key={team.teamId}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white p-1"
-                >
-                  <Image
-                    src={team.logoUrl}
-                    alt=""
-                    width={20}
-                    height={20}
-                    className="h-5 w-5 object-contain"
-                  />
-                </span>
-              ))}
-            </span>
-          ) : null}
-          <span className="inline-flex min-h-11 shrink-0 items-center gap-1 px-2 text-xs font-bold text-slate-700 transition group-hover:bg-slate-100 motion-reduce:transition-none">
-            Read
-            <BookOpen className="h-3 w-3" aria-hidden="true" />
+          <span className="shrink-0 text-slate-600 group-hover:text-slate-950">
+            <span className="sr-only">Read article</span>
+            <BookOpen className="h-4 w-4" aria-hidden="true" />
           </span>
         </button>
-        <Link
-          href="/headlines"
-          className="hidden min-h-11 shrink-0 items-center gap-1 border-l border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 motion-reduce:transition-none sm:flex"
-        >
-          Archive
-          <ArrowRight className="h-3 w-3" aria-hidden="true" />
-        </Link>
       </section>
 
       {isOpen

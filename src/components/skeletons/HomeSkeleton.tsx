@@ -121,7 +121,7 @@ export function HomeSkeleton() {
       aria-busy="true"
       className="gshl-page"
     >
-      <div className="space-y-3 sm:space-y-4 lg:space-y-5">
+      <div className="space-y-2">
         <section
           aria-label="Loading GSHL matchups"
           className="min-w-0 overflow-hidden"
@@ -133,12 +133,32 @@ export function HomeSkeleton() {
             ))}
           </div>
         </section>
-        <UfaHomeCardSkeleton />
-        <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 lg:grid-cols-2">
-          <PowerRankingsHomeCardSkeleton />
-          <NHLScheduleHomeCardSkeleton />
-          <PowerRankingsHomeCardSkeleton />
-          <LeagueActivityCardSkeleton />
+        <div className="grid min-w-0 items-start gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1.1fr)_repeat(2,minmax(0,1fr))]">
+          <div className="min-w-0 space-y-2">
+            <section
+              className="gshl-section space-y-2"
+              aria-label="Loading league news"
+            >
+              <Skeleton className="h-8 w-28" />
+              <Skeleton className="h-14 w-full" />
+            </section>
+            <LeagueActivityCardSkeleton />
+          </div>
+          <section
+            className="gshl-section space-y-1"
+            aria-label="Loading standings"
+          >
+            <Skeleton className="h-8 w-28" />
+            {Array.from({ length: 7 }, (_, index) => (
+              <Skeleton key={index} className="h-11 w-full" />
+            ))}
+          </section>
+          <div className="min-w-0 md:col-start-1 md:row-start-2 lg:col-start-3 lg:row-start-1">
+            <PowerRankingsHomeCardSkeleton />
+          </div>
+          <div className="min-w-0 md:col-start-2 md:row-start-2 lg:col-start-1">
+            <NHLScheduleHomeCardSkeleton />
+          </div>
         </div>
       </div>
     </main>

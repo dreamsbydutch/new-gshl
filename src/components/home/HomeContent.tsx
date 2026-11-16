@@ -24,7 +24,7 @@ export function HomeContent() {
   return (
     <main
       aria-labelledby="home-dashboard-heading"
-      className="gshl-page space-y-3"
+      className="gshl-page space-y-2"
     >
       <div className="min-w-0">
         <h1 id="home-dashboard-heading" className="sr-only">
@@ -38,8 +38,10 @@ export function HomeContent() {
           </p>
         )}
       </div>
-      <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
-        <div className="min-w-0 space-y-3">
+      <div
+        className={`grid min-w-0 items-start gap-2 md:grid-cols-2 ${view.season ? "lg:grid-cols-[minmax(0,1.1fr)_repeat(2,minmax(0,1fr))]" : ""}`}
+      >
+        <div className="min-w-0 space-y-2">
           <section aria-label="League headlines" className="gshl-section">
             <SectionHeading
               id="home-news-heading"
@@ -166,17 +168,27 @@ export function HomeContent() {
             )}
           </section>
         </div>
-        <div className="min-w-0 space-y-3">
-          {view.season ? <StandingsPreview seasonId={view.season.id} /> : null}
-        </div>
-      </div>
-      <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
         {view.season ? (
-          <PowerRankingsHomeCard seasonId={view.season.id} />
+          <div className="min-w-0">
+            <StandingsPreview seasonId={view.season.id} />
+          </div>
         ) : null}
-        <NHLScheduleHomeCard />
+        {view.season ? (
+          <div className="min-w-0 md:col-start-1 md:row-start-2 lg:col-start-3 lg:row-start-1">
+            <PowerRankingsHomeCard seasonId={view.season.id} />
+          </div>
+        ) : null}
+        <div
+          className={`min-w-0 ${view.season ? "md:col-start-2 md:row-start-2 lg:col-start-1" : ""}`}
+        >
+          <NHLScheduleHomeCard />
+        </div>
+        {view.season ? (
+          <div className="min-w-0 md:col-span-2 lg:col-start-2 lg:row-start-2">
+            <LineupShameCard seasonId={view.season.id} />
+          </div>
+        ) : null}
       </div>
-      {view.season ? <LineupShameCard seasonId={view.season.id} /> : null}
     </main>
   );
 }
