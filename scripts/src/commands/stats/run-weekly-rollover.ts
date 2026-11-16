@@ -219,7 +219,8 @@ async function main() {
       power: async () => {
         run("power/rebuild-power-ratings.ts", [
           "--after-week-id",
-          due.at(-1)!.id,
+          // Catch up every missing entering snapshot, preserving ranks through the oldest ended week.
+          due[0]!.id,
         ]);
       },
       publish: async () => {
