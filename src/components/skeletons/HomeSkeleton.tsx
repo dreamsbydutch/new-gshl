@@ -133,7 +133,7 @@ export function HomeSkeleton() {
             ))}
           </div>
         </section>
-        <div className="grid min-w-0 items-start gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1.1fr)_repeat(2,minmax(0,1fr))]">
+        <div className="grid min-w-0 items-start gap-2 md:grid-cols-2">
           <div className="min-w-0 space-y-2">
             <section
               className="gshl-section space-y-2"
@@ -146,19 +146,25 @@ export function HomeSkeleton() {
           </div>
           <section
             className="gshl-section space-y-1"
-            aria-label="Loading standings"
+            aria-label="Loading standings and power rankings"
           >
             <Skeleton className="h-8 w-28" />
             {Array.from({ length: 7 }, (_, index) => (
-              <Skeleton key={index} className="h-11 w-full" />
+              <Skeleton key={index} className="mx-auto h-11 w-full max-w-sm" />
             ))}
           </section>
-          <div className="min-w-0 md:col-start-1 md:row-start-2 lg:col-start-3 lg:row-start-1">
-            <PowerRankingsHomeCardSkeleton />
-          </div>
-          <div className="min-w-0 md:col-start-2 md:row-start-2 lg:col-start-1">
+          <div className="min-w-0">
             <NHLScheduleHomeCardSkeleton />
           </div>
+          <section
+            className="gshl-section min-w-0 space-y-1"
+            aria-label="Loading Bench of shame"
+          >
+            <Skeleton className="h-8 w-28" />
+            {Array.from({ length: 14 }, (_, index) => (
+              <Skeleton key={index} className="mx-auto h-10 w-full max-w-sm" />
+            ))}
+          </section>
         </div>
       </div>
     </main>

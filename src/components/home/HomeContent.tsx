@@ -8,7 +8,6 @@ import { HomeSkeleton } from "@gshl-skeletons";
 import { showDate } from "@gshl-utils";
 import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
 import { SectionHeading } from "@gshl-components/ui/SectionHeading";
-import { PowerRankingsHomeCard } from "./PowerRankingsHomeCard";
 import { NHLScheduleHomeCard } from "./NHLScheduleHomeCard";
 import { DraftHubCard } from "./DraftHubCard";
 import { HomeScoreboard } from "./HomeScoreboard";
@@ -38,9 +37,7 @@ export function HomeContent() {
           </p>
         )}
       </div>
-      <div
-        className={`grid min-w-0 items-start gap-2 md:grid-cols-2 ${view.season ? "lg:grid-cols-[minmax(0,1.1fr)_repeat(2,minmax(0,1fr))]" : ""}`}
-      >
+      <div className="grid min-w-0 items-start gap-2 md:grid-cols-2">
         <div className="min-w-0 space-y-2">
           <section aria-label="League headlines" className="gshl-section">
             <SectionHeading
@@ -49,7 +46,9 @@ export function HomeContent() {
               href="/headlines"
               action="All news"
             />
-            <WeeklyEditionHomeCard />
+            <div className="mx-auto w-full max-w-sm">
+              <WeeklyEditionHomeCard />
+            </div>
           </section>
           {view.attention.length ? (
             <section
@@ -93,7 +92,7 @@ export function HomeContent() {
                 Loading updates…
               </p>
             ) : view.activity.length ? (
-              <ul className="divide-y divide-slate-100">
+              <ul className="mx-auto w-full max-w-sm divide-y divide-slate-100">
                 {view.activity.map((event) => (
                   <li key={event.id}>
                     <Link
@@ -173,18 +172,11 @@ export function HomeContent() {
             <StandingsPreview seasonId={view.season.id} />
           </div>
         ) : null}
-        {view.season ? (
-          <div className="min-w-0 md:col-start-1 md:row-start-2 lg:col-start-3 lg:row-start-1">
-            <PowerRankingsHomeCard seasonId={view.season.id} />
-          </div>
-        ) : null}
-        <div
-          className={`min-w-0 ${view.season ? "md:col-start-2 md:row-start-2 lg:col-start-1" : ""}`}
-        >
+        <div className="min-w-0">
           <NHLScheduleHomeCard />
         </div>
         {view.season ? (
-          <div className="min-w-0 lg:col-start-2 lg:row-start-2">
+          <div className="min-w-0">
             <LineupShameCard seasonId={view.season.id} />
           </div>
         ) : null}

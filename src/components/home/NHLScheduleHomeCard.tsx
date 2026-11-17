@@ -23,7 +23,7 @@ export function NHLScheduleHomeCard() {
           </span>
         </h2>
         <div
-          className="mt-1 grid grid-cols-3 gap-1"
+          className="mx-auto mt-1 grid max-w-sm grid-cols-3 gap-1"
           role="group"
           aria-label="NHL schedule day"
         >
@@ -40,7 +40,7 @@ export function NHLScheduleHomeCard() {
           ))}
         </div>
       </header>
-      <div className="py-1">
+      <div className="mx-auto max-w-sm py-1">
         <h3 className="py-2 text-xs font-semibold text-slate-600">
           <time dateTime={schedule.selectedDay.date}>
             {schedule.selectedDay.dateLabel}
@@ -85,7 +85,7 @@ export function NHLScheduleHomeCard() {
                     href={`/nhl/matchup/${game.id}`}
                     prefetch={false}
                     aria-label={`${awayName} at ${homeName}${hasScore ? `, ${away.score ?? "–"} to ${home.score ?? "–"}` : ""}. ${status}. View matchup.`}
-                    className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    className="flex min-h-11 flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   >
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                       <NHLLogo
@@ -115,7 +115,7 @@ export function NHLScheduleHomeCard() {
                       <span>{home.abbrev}</span>
                     </span>
                     <span
-                      className={`ml-auto whitespace-nowrap text-xs ${["LIVE", "CRIT"].includes(game.gameState) ? "font-semibold text-emerald-700" : "text-slate-500"}`}
+                      className={`whitespace-nowrap text-xs ${["LIVE", "CRIT"].includes(game.gameState) ? "font-semibold text-emerald-700" : "text-slate-500"}`}
                     >
                       {status}
                     </span>
@@ -127,7 +127,7 @@ export function NHLScheduleHomeCard() {
         )}
       </div>
       {schedule.data && (
-        <p className="border-t border-slate-100 px-3 py-3 text-xs text-slate-500 sm:px-5">
+        <p className="border-t border-slate-100 py-2 text-center text-xs text-slate-500">
           Updated{" "}
           <time dateTime={new Date(schedule.data.updatedAt).toISOString()}>
             {formatNHLUpdatedAt(schedule.data.updatedAt)}

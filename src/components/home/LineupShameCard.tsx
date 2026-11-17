@@ -98,7 +98,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
         <div
           role="status"
           aria-label="Loading lineup rankings"
-          className="space-y-2 py-2"
+          className="mx-auto max-w-sm space-y-2 py-2"
         >
           {Array.from({ length: 7 }, (_, index) => (
             <Skeleton key={index} className="h-9 w-full" />
@@ -114,7 +114,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
         </p>
       ) : (
         <>
-          <div className="min-w-0">
+          <div className="mx-auto w-full min-w-0 max-w-sm">
             <div className="min-w-0">
               <table className="w-full table-fixed text-sm">
                 <caption className="sr-only">
