@@ -1,7 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import {
@@ -131,6 +133,9 @@ export function LockerRoomContent() {
   const currentTeam = teamCatalog.teamOptions.find(
     (team) => team.ownerId === selectedOwnerId,
   );
+  const yahooTeamId = currentTeam?.ownerIsActive
+    ? currentTeam.yahooId?.trim()
+    : undefined;
   const teams = allTeams.filter(
     (team) => team.seasonId === (currentTeam?.seasonId ?? contextSeason?.id),
   );
@@ -301,14 +306,27 @@ export function LockerRoomContent() {
               Contracts & commitments →
             </span>
           </Link>
-          <a
-            href="https://hockey.fantasysports.yahoo.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="gshl-text-action"
-          >
-            Manage lineup on Yahoo ↗
-          </a>
+          {yahooTeamId ? (
+            <a
+              href={`https://hockey.fantasysports.yahoo.com/hockey/44541/${encodeURIComponent(yahooTeamId)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Manage lineup on Yahoo (opens in a new tab)"
+              title="Manage lineup on Yahoo (opens in a new tab)"
+              className="gshl-text-action gap-2"
+            >
+              <Image
+                src="/yahoo-fantasy.png"
+                alt=""
+                aria-hidden="true"
+                width={112}
+                height={38}
+                className="h-auto w-28"
+              />
+              <span>Manage lineup</span>
+              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
       ) : null}
       {isInactiveOwner && (

@@ -115,7 +115,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                               week: matchupWeek.id,
                             })}
                             title={`${status} matchup`}
-                            className={`relative flex items-center gap-2 rounded border border-slate-200 px-2 py-1.5 text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${isFinal || isUpcoming ? "bg-white hover:bg-slate-50" : "bg-sky-50/70 hover:bg-sky-50"}`}
+                            className={`relative flex items-center gap-2 rounded border border-slate-200 px-2 py-1.5 text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${!isFinal && matchupPhase === "current" ? "bg-sky-50/70 hover:bg-sky-50" : "bg-white hover:bg-slate-50"}`}
                           >
                             <span className="sr-only">{status}. </span>
                             <div className="min-w-0 flex-1 space-y-1">
