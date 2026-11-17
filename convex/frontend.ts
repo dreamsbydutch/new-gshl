@@ -726,8 +726,8 @@ export const powerRankingsPreview = query({
       : null;
     if (args.weekId && !requestedWeek) return null;
     const today = args.referenceDate ?? utcTimestampToDateKey(Date.now());
-    // Completed weeks keep their own snapshot. Active/upcoming matchups can
-    // use the latest saved rankings when this week's snapshot is not ready.
+    // Completed weeks use their own snapshot or the nearest older one.
+    // Active/upcoming matchups use the latest rankings saved through today.
     const historicalWeek =
       requestedWeek &&
       utcTimestampToDateKey(requestedWeek.startDate) <= today &&
@@ -738,7 +738,8 @@ export const powerRankingsPreview = query({
     const eligibleWeeks = args.weekId
       ? weeks.filter((week) =>
           historicalWeek
-            ? week._id === historicalWeek._id
+            ? utcTimestampToDateKey(week.startDate) <=
+              utcTimestampToDateKey(historicalWeek.startDate)
             : utcTimestampToDateKey(week.startDate) <= today,
         )
       : weeks;
