@@ -40,6 +40,65 @@ import {
   weeklyEditionContractAffectsSeason,
 } from "./weekly-edition";
 import { matchupPreviewWriterProfile } from "./matchup-preview-articles";
+import { rulebookSections } from "../../../content/rulebook";
+import {
+  buildWeeklyEditionReviewRequest,
+  buildWeeklyEditionReviewVerdictRequest,
+} from "./weekly-edition-openai";
+
+void test("every newsroom stage receives the complete official rulebook", () => {
+  const facts = buildWeeklyEditionFactPacket(source());
+  const content = buildTemplateWeeklyEdition(facts);
+  const context = buildWeeklyEditionRuleContext(facts);
+  assert.deepEqual(context.officialRulebook.sections, rulebookSections);
+  const prompts = [
+    buildWeeklyEditionStoryScoutPrompt(facts),
+    buildWeeklyEditionChatGptPrompt(facts),
+    buildWeeklyEditionReviewRequest({ model: "test", facts, content }).input,
+    buildWeeklyEditionReviewVerdictRequest({
+      model: "test",
+      facts,
+      content,
+      review: {
+        issues: [],
+        replacementArticleIds: [],
+        errors: [],
+        affectedArticleIds: [],
+      },
+    }).input,
+  ];
+  for (const prompt of prompts) {
+    for (const section of rulebookSections) {
+      for (const rule of section.rules) assert.ok(prompt.includes(rule.id));
+    }
+    assert.match(prompt, /5-2, not 5-1-1/);
+  }
+});
+
+void test("legacy-season recap preserves a genuine tie", () => {
+  const base = source();
+  const packet = buildWeeklyEditionFactPacket({
+    ...base,
+    season: { ...base.season, usesLegacyTies: true },
+    matchups: [{ ...base.matchups[0]!, homeScore: 5, awayScore: 5 }],
+  });
+  assert.equal(packet.matchups[0]!.winnerTeamId, undefined);
+  assert.equal(packet.matchups[0]!.rankUpset, 0);
+});
+
+void test("a 5-5 recap names the home-ice winner instead of a draw", () => {
+  const base = source();
+  const packet = buildWeeklyEditionFactPacket({
+    ...base,
+    matchups: [{ ...base.matchups[0]!, homeScore: 5, awayScore: 5 }],
+  });
+  assert.equal(packet.matchups[0]!.winnerTeamId, base.matchups[0]!.homeTeamId);
+  assert.equal(packet.matchups[0]!.loserTeamId, base.matchups[0]!.awayTeamId);
+  assert.match(
+    packet.editorialCandidates.find((row) => row.kind === "matchup")!.summary,
+    /home-ice/,
+  );
+});
 
 void test("contribution-backed editorial performances show 0–100 ratings without legacy importance grades", () => {
   const base = source();
@@ -645,7 +704,7 @@ void test("handles ties and inverse goalie categories", () => {
       },
     ],
   });
-  assert.equal(packet.matchups[0]?.winnerTeamName, undefined);
+  assert.equal(packet.matchups[0]?.winnerTeamName, "Aurora");
 });
 
 void test("template generation is varied but deterministic and activity-aware", () => {
@@ -1936,7 +1995,10 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       );
     }
     const prompt = buildWeeklyEditionChatGptPrompt(packet);
-    const ruleContext = JSON.stringify(buildWeeklyEditionRuleContext(packet));
+    const { officialRulebook, ...editionRules } =
+      buildWeeklyEditionRuleContext(packet);
+    assert.deepEqual(officialRulebook.sections, rulebookSections);
+    const ruleContext = JSON.stringify(editionRules);
     assert.match(ruleContext, /America\/Toronto/);
     if (issueType === "resigning_outlook") {
       assert.match(ruleContext, /signingStatus/);

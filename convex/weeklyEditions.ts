@@ -1151,6 +1151,7 @@ async function buildSource(
       id: String(season._id),
       name: season.name,
       year: String(season.year),
+      usesLegacyTies: season.usesLegacyTies,
       endDate: dateKey(season.endDate),
       signingEndDate: dateKey(season.signingEndDate),
       draftStartAt: isoTimestamp(season.draftStartAt),
@@ -1818,6 +1819,7 @@ async function buildMilestoneSource(
       id: String(season._id),
       name: season.name,
       year: String(season.year),
+      usesLegacyTies: season.usesLegacyTies,
       endDate: seasonEnd,
       signingEndDate: signingEnd,
       draftStartAt: isoTimestamp(analysisSeason.draftStartAt),
@@ -2407,6 +2409,7 @@ async function enrichNewsroomResearch(
         },
       ];
     }),
+    analysisSeason.usesLegacyTies,
   );
   return {
     ...enriched,

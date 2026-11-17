@@ -367,6 +367,7 @@ export interface WeeklyEditionFactPacket {
     id: string;
     name: string;
     year: string;
+    usesLegacyTies?: boolean;
     endDate?: string;
     signingEndDate?: string;
     draftStartAt?: string;

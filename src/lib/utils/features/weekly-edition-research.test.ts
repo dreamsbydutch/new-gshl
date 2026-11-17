@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  teamResultEvidence,
   ownerParticipation,
   researchCandidates,
   selectResearchEvidence,
@@ -17,6 +18,29 @@ const seasons = [2020, 2021, 2022, 2023].map((year) => ({
   name: `Season ${year}`,
   year,
 }));
+
+void test("equal categories give the away team a loss: Dirty F & Gs move to 5-2", () => {
+  const results = Array.from({ length: 7 }, (_, index) => ({
+    id: `game-${index}`,
+    weekNumber: index + 1,
+    homeTeamId: "rudders",
+    awayTeamId: "dirty",
+    homeScore: index < 5 ? 4 : index === 5 ? 6 : 5,
+    awayScore: index < 5 ? 6 : index === 5 ? 4 : 5,
+  }));
+  const teams = [
+    { teamId: "dirty", name: "Dirty F & Gs" },
+    { teamId: "rudders", name: "Dutch Rudders" },
+  ];
+  const facts = teamResultEvidence(teams, results);
+  assert.match(facts[0]!.summary, /5 wins, 2 losses/);
+  assert.match(facts[1]!.summary, /2 wins, 5 losses/);
+  assert.doesNotMatch(facts[0]!.summary, /1 ties/);
+  assert.match(
+    teamResultEvidence(teams, results, true)[0]!.summary,
+    /5 wins, 1 losses and 1 ties/,
+  );
+});
 
 void test("matchup scouting compares shared production, ranks ties equally and respects inverse goalie ratios", () => {
   const options = {
