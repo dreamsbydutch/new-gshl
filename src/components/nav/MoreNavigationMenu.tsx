@@ -3,106 +3,50 @@
 import Link from "next/link";
 import {
   BookOpenText,
-  Newspaper,
-  Bell,
   ClipboardList,
   Menu,
-  Trophy,
   CalendarDays,
   ShieldCheck,
   ChartNoAxesCombined,
 } from "lucide-react";
-import { useAuthSession } from "@gshl-hooks";
+import { useAppSearchParams, useAuthSession } from "@gshl-hooks";
+import { useStatsNavigation } from "@gshl-hooks/main/useNav";
 import type { MainNavbarMoreMenuProps } from "@gshl-types";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@gshl-ui";
 import { cn } from "@gshl-utils";
 
-const moreItems = [
-  {
-    label: "League overview",
-    description: "Matchups and playoff picture",
-    href: "/league",
-    icon: Trophy,
-  },
-  {
-    label: "Records",
-    description: "Career, season and weekly leaders",
-    href: "/records",
-    icon: Trophy,
-  },
-  {
-    label: "Free agency",
-    description: "Available players and offers",
-    href: "/leagueoffice?view=freeAgents",
-    icon: ClipboardList,
-  },
-  {
-    label: "Draft hub",
-    description: "Board, draft classes and team picks",
-    href: "/draft",
-    icon: CalendarDays,
-  },
-  {
-    label: "League activity",
-    description: "Transactions and roster moves",
-    href: "/activity",
-    icon: Bell,
-  },
-  {
-    label: "NHL Explorer",
-    description: "Team talent, player GAR, and contract value",
-    href: "/nhl",
-    icon: ChartNoAxesCombined,
-  },
-  {
-    label: "League news",
-    description: "League news and weekly editions",
-    href: "/headlines",
-    icon: Newspaper,
-  },
-  {
-    label: "Rulebook",
-    description: "League rules and policies",
-    href: "/rulebook",
-    icon: BookOpenText,
-  },
-  {
-    label: "Team history",
-    description: "Past results, records and trophies",
-    href: "/lockerroom?view=history",
-    icon: ClipboardList,
-  },
-  {
-    label: "Notifications",
-    description: "Draft alerts and delivery settings",
-    href: "/notifications",
-    icon: Bell,
-  },
-];
-
-const adminItem = {
-  label: "Admin",
-  description: "Commissioner tools and TV displays",
-  href: "/admin",
-  icon: ShieldCheck,
-};
-
-function isMenuRouteActive(pathname: string, href: string): boolean {
-  if (href === "/rulebook" && pathname === "/rules") return true;
+function isMenuRouteActive(
+  pathname: string,
+  search: string,
+  href: string,
+): boolean {
+  const [route, query] = href.split("?");
+  if (!route) return false;
   if (
-    href === "/draft" &&
-    (pathname === "/draftboard" || pathname.startsWith("/draftboard/"))
-  ) {
+    route === "/rulebook" &&
+    (pathname === "/rules" || pathname.startsWith("/rules/"))
+  )
     return true;
+  if (route === "/stats" && pathname === "/players") return true;
+  if (
+    route === "/draft" &&
+    (pathname === "/draftboard" || pathname.startsWith("/draftboard/"))
+  )
+    return true;
+  if (route === "/leagueoffice") {
+    return (
+      pathname === route &&
+      new URLSearchParams(search).get("view") ===
+        new URLSearchParams(query).get("view")
+    );
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === route || pathname.startsWith(`${route}/`);
 }
 
 export function MoreNavigationMenu({
@@ -112,8 +56,21 @@ export function MoreNavigationMenu({
 }: MainNavbarMoreMenuProps) {
   const isMobile = placement === "mobile";
   const { session } = useAuthSession();
-  const AdminIcon = adminItem.icon;
-
+  const { search } = useAppSearchParams();
+  const statsNavigation = useStatsNavigation();
+  const items = [
+    { label: "Stats", href: statsNavigation.href, icon: ChartNoAxesCombined },
+    {
+      label: "Free agency",
+      href: "/leagueoffice?view=freeAgents",
+      icon: ClipboardList,
+    },
+    { label: "Draft hub", href: "/draft", icon: CalendarDays },
+    { label: "NHL Explorer", href: "/nhl", icon: ChartNoAxesCombined },
+    ...(isMobile
+      ? [{ label: "Rulebook", href: "/rulebook", icon: BookOpenText }]
+      : []),
+  ];
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -125,8 +82,8 @@ export function MoreNavigationMenu({
               ? "bg-slate-900 text-white"
               : "text-slate-700 hover:bg-slate-100",
             isMobile
-              ? "flex flex-col gap-0 px-2 text-[10px] text-white hover:bg-slate-800 lg:hidden"
-              : "hidden px-3 py-2 text-sm lg:flex",
+              ? "flex h-full min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-1 py-1 text-[11px] lg:hidden"
+              : "hidden px-2 py-2 text-sm lg:flex xl:px-3",
           )}
           aria-label="Open league menu"
         >
@@ -135,36 +92,25 @@ export function MoreNavigationMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        side="bottom"
+        side={isMobile ? "top" : "bottom"}
         align="end"
-        sideOffset={isMobile ? 12 : 10}
-        className="z-[70] max-h-[75dvh] w-72 overflow-y-auto p-2"
+        sideOffset={8}
+        className="z-[70] max-h-[75dvh] w-52 overflow-y-auto p-1"
       >
-        <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-slate-500">
-          Explore GSHL
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {moreItems.map(({ label, description, href, icon: Icon }) => {
-          const isCurrent = isMenuRouteActive(pathname, href);
+        {items.map(({ label, href, icon: Icon }) => {
+          const isCurrent = isMenuRouteActive(pathname, search, href);
           return (
             <DropdownMenuItem
               key={href}
               asChild
               className={cn(
-                "min-h-12 cursor-pointer rounded-lg px-3 py-2",
+                "min-h-11 cursor-pointer rounded px-3 py-2",
                 isCurrent && "bg-slate-100",
               )}
             >
               <Link href={href} aria-current={isCurrent ? "page" : undefined}>
-                <Icon className="h-5 w-5 text-slate-600" aria-hidden="true" />
-                <span className="min-w-0">
-                  <span className="block font-semibold text-slate-900">
-                    {label}
-                  </span>
-                  <span className="block truncate text-xs text-slate-500">
-                    {description}
-                  </span>
-                </span>
+                <Icon className="h-4 w-4 text-slate-600" aria-hidden="true" />
+                <span className="font-semibold text-slate-900">{label}</span>
               </Link>
             </DropdownMenuItem>
           );
@@ -172,36 +118,26 @@ export function MoreNavigationMenu({
         {session?.user.role === "commissioner" ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-slate-500">
-              Commissioner
-            </DropdownMenuLabel>
             <DropdownMenuItem
               asChild
               className={cn(
-                "min-h-12 cursor-pointer rounded-lg px-3 py-2",
-                isMenuRouteActive(pathname, adminItem.href) && "bg-slate-100",
+                "min-h-11 cursor-pointer rounded px-3 py-2",
+                isMenuRouteActive(pathname, search, "/admin") && "bg-slate-100",
               )}
             >
               <Link
-                href={adminItem.href}
+                href="/admin"
                 aria-current={
-                  isMenuRouteActive(pathname, adminItem.href)
+                  isMenuRouteActive(pathname, search, "/admin")
                     ? "page"
                     : undefined
                 }
               >
-                <AdminIcon
-                  className="h-5 w-5 text-slate-600"
+                <ShieldCheck
+                  className="h-4 w-4 text-slate-600"
                   aria-hidden="true"
                 />
-                <span className="min-w-0">
-                  <span className="block font-semibold text-slate-900">
-                    {adminItem.label}
-                  </span>
-                  <span className="block truncate text-xs text-slate-500">
-                    {adminItem.description}
-                  </span>
-                </span>
+                <span className="font-semibold text-slate-900">Admin</span>
               </Link>
             </DropdownMenuItem>
           </>

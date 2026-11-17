@@ -23,7 +23,7 @@ void test("calculates bounded page scroll progress", () => {
 
 void test("maps primary routes to the correct persistent navigation item", () => {
   assert.equal(getAppShellRouteContext("/").activeNavId, "home");
-  assert.equal(getAppShellRouteContext("/stats").activeNavId, "stats");
+  assert.equal(getAppShellRouteContext("/stats").activeNavId, "more");
   assert.equal(getAppShellRouteContext("/teams").activeNavId, "lockerroom");
   assert.equal(getAppShellRouteContext("/schedule").activeNavId, "schedule");
   assert.equal(getAppShellRouteContext("/standings").activeNavId, "standings");
@@ -36,6 +36,21 @@ void test("maps primary routes to the correct persistent navigation item", () =>
     title: "Admin",
     activeNavId: "more",
   });
+});
+
+void test("groups Stats under Menu and gives Rulebook a desktop destination", () => {
+  for (const path of ["/stats", "/players"]) {
+    assert.deepEqual(getAppShellRouteContext(path), {
+      title: "Stats",
+      activeNavId: "more",
+    });
+  }
+  for (const path of ["/rulebook", "/rules", "/rulebook/contracts"]) {
+    assert.deepEqual(getAppShellRouteContext(path), {
+      title: "Rulebook",
+      activeNavId: "rulebook",
+    });
+  }
 });
 
 void test("keeps detail routes connected to their parent destination", () => {

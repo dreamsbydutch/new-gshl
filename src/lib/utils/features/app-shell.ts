@@ -7,7 +7,7 @@ export type AppShellNavId =
   | "home"
   | "schedule"
   | "standings"
-  | "stats"
+  | "rulebook"
   | "lockerroom"
   | "more";
 
@@ -116,12 +116,12 @@ export function getAppShellRouteContext(
     return { title: "League news", activeNavId: "more" };
   }
   if (isRoute(pathname, "/rulebook") || isRoute(pathname, "/rules")) {
-    return { title: "Rulebook", activeNavId: "more" };
+    return { title: "Rulebook", activeNavId: "rulebook" };
   }
   if (isRoute(pathname, "/league"))
     return { title: "League", activeNavId: "more" };
   if (isRoute(pathname, "/stats") || isRoute(pathname, "/players"))
-    return { title: "Stats", activeNavId: "stats" };
+    return { title: "Stats", activeNavId: "more" };
   if (isRoute(pathname, "/leagueoffice")) {
     const view = readContextualNavigationQuery(search).view;
     return {

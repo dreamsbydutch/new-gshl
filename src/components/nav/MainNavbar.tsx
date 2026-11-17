@@ -15,7 +15,7 @@ import {
   Shirt,
   Trophy,
   CalendarDays,
-  ChartNoAxesCombined,
+  BookOpenText,
 } from "lucide-react";
 import { useAppPathname, useGlobalSeasonContextNavigation } from "@gshl-hooks";
 import {
@@ -26,7 +26,6 @@ import {
 import { NavContainer, LinkNavItem } from "./BaseComponents";
 import type { LinkNavItem as LinkNavItemType, NavbarProps } from "@gshl-types";
 import { useOwnerTeam } from "@gshl-hooks/features/useOwnerTeam";
-import { useStatsNavigation } from "@gshl-hooks/main/useNav";
 import { AuthNavControl } from "@gshl-components/auth";
 import { HeaderTeamSelect } from "./HeaderTeamSelect";
 import { MoreNavigationMenu } from "./MoreNavigationMenu";
@@ -42,7 +41,6 @@ import {
  */
 export function MainNavbar({ className, search = "" }: NavbarProps) {
   const owner = useOwnerTeam();
-  const statsNavigation = useStatsNavigation();
   const { pathname } = useAppPathname();
   const routeContext = getAppShellRouteContext(pathname, search);
   const showTeamControl = pathname === "/lockerroom";
@@ -112,12 +110,6 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
       href: "/standings",
       icon: <Trophy className="h-5 w-5" aria-hidden="true" />,
     },
-    {
-      id: "stats",
-      label: "Stats",
-      href: statsNavigation.href,
-      icon: <ChartNoAxesCombined className="h-5 w-5" aria-hidden="true" />,
-    },
   ];
   const seasonControlProps = seasonNavigation.selectedSeasonSummary
     ? {
@@ -183,11 +175,6 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
               ))}
           </div>
           <div className="flex items-center justify-end gap-1">
-            <MoreNavigationMenu
-              pathname={pathname}
-              isActive={routeContext.activeNavId === "more"}
-              placement="mobile"
-            />
             <AuthNavControl compact />
           </div>
         </div>
@@ -206,7 +193,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
         <div
           className={cn(
             className,
-            "mx-auto flex h-[var(--app-primary-nav-height)] w-full max-w-7xl items-stretch px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] lg:items-center lg:gap-4 lg:px-5",
+            "mx-auto flex h-[var(--app-primary-nav-height)] w-full max-w-7xl items-stretch px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] lg:items-center lg:gap-2 lg:px-3 xl:gap-4 xl:px-5",
           )}
         >
           <Link
@@ -223,7 +210,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
               className="h-8 w-8 rounded-full object-contain"
               priority
             />
-            <span>GSHL</span>
+            <span className="hidden xl:inline">GSHL</span>
           </Link>
           <div className="flex min-w-0 flex-1 items-stretch justify-around lg:hidden">
             {navItems.map((item) => (
@@ -234,6 +221,14 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
                 className="h-full min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-1 py-1 text-[11px]"
               />
             ))}
+            <MoreNavigationMenu
+              pathname={pathname}
+              isActive={
+                routeContext.activeNavId === "more" ||
+                routeContext.activeNavId === "rulebook"
+              }
+              placement="mobile"
+            />
           </div>
           <div className="hidden min-w-0 flex-1 items-stretch justify-center gap-1 lg:flex">
             {navItems.map((item) => (
@@ -241,9 +236,17 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
                 key={item.id}
                 {...item}
                 isActive={routeContext.activeNavId === item.id}
-                className="h-11 flex-none flex-row gap-2 px-3 py-2 text-sm"
+                className="h-11 flex-none flex-row gap-1.5 px-2 py-2 text-sm xl:gap-2 xl:px-3"
               />
             ))}
+            <LinkNavItem
+              id="rulebook"
+              label="Rulebook"
+              href="/rulebook"
+              icon={<BookOpenText className="h-5 w-5" aria-hidden="true" />}
+              isActive={routeContext.activeNavId === "rulebook"}
+              className="h-11 flex-none flex-row gap-1.5 px-2 py-2 text-sm xl:gap-2 xl:px-3"
+            />
             <MoreNavigationMenu
               pathname={pathname}
               isActive={routeContext.activeNavId === "more"}
