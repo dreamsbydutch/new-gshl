@@ -55,7 +55,10 @@ export function useDraftAdminList(
 
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: nhlTeams } = useNHLTeams();
-  const { data: draftPicks = [] } = useDraftPicks();
+  const { data: draftPicks = [] } = useDraftPicks({
+    seasonId,
+    enabled: Boolean(seasonId),
+  });
   const { data: gshlTeams } = useTeams({ seasonId });
 
   const draftPickQuery = useMemo(

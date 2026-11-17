@@ -1609,12 +1609,9 @@ export function parseDailyNhlPlayerStatSyncOptions(
 export async function runDailyNhlPlayerStatSync(
   options: DailyNhlPlayerStatSyncOptions,
 ): Promise<DailyNhlPlayerStatSyncSummary> {
-  const [seasonRows, weekRows, teamRows, playerRows] = (await Promise.all([
-    convexReader.fetchModel<DatabaseRecord>("Season"),
-    convexReader.fetchModel<DatabaseRecord>("Week"),
-    convexReader.fetchModel<DatabaseRecord>("Team"),
-    convexReader.fetchModel<DatabaseRecord>("Player"),
-  ])) as unknown as [Season[], Week[], Team[], Player[]];
+  const seasonRows = (await convexReader.fetchModel<DatabaseRecord>(
+    "Season",
+  )) as unknown as Season[];
 
   const targetDateHint =
     options.date ||
@@ -1633,6 +1630,11 @@ export async function runDailyNhlPlayerStatSync(
     );
   }
   const activeSeasonCategories = buildSeasonCategorySet(season);
+  const [weekRows, teamRows, playerRows] = (await Promise.all([
+    dataStore.fetchSeasonModel<DatabaseRecord>("Week", resolvedSeasonId),
+    dataStore.fetchSeasonModel<DatabaseRecord>("Team", resolvedSeasonId),
+    convexReader.fetchModel<DatabaseRecord>("Player"),
+  ])) as unknown as [Week[], Team[], Player[]];
   const nhlSeasonToken = resolveNhlSeasonTokenFromSeason(season);
 
   const resolvedWeekIds = resolveRequestedRecordIds(
@@ -2059,3 +2061,4 @@ export async function runDailyNhlPlayerStatSync(
     aggregateSummary,
   };
 }
+

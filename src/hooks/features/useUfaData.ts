@@ -23,9 +23,10 @@ import { resolveUfaSigningSeason } from "@gshl-utils/features/ufa-deadline";
 
 export function useUfaOverview(
   mode: UfaOverviewMode = "full",
+  enabled = true,
 ): UseUfaOverviewResult {
   const { session } = useAuthSession();
-  const { state: rawState, catalog: rawCatalog } = useUfaCatalog(mode);
+  const { state: rawState, catalog: rawCatalog } = useUfaCatalog(mode, enabled);
   const state = useMemo(() => normalizeUfaPublicState(rawState), [rawState]);
   const data = useMemo(() => {
     if (rawState === undefined || rawCatalog === undefined) {
@@ -118,9 +119,10 @@ export function useUfaOverview(
                   : null,
       };
     });
-    const freeAgents: UfaFreeAgentView[] = mode === "home" && isSignedInOwner
-      ? selectAffordableUfas(rankedFreeAgents)
-      : rankedFreeAgents;
+    const freeAgents: UfaFreeAgentView[] =
+      mode === "home" && isSignedInOwner
+        ? selectAffordableUfas(rankedFreeAgents)
+        : rankedFreeAgents;
     const playerById = new Map(
       rankedFreeAgents.map((player) => [player.id, player]),
     );
@@ -194,7 +196,7 @@ export function useUfaOverview(
 
   return {
     data,
-    isLoading: data === undefined,
+    isLoading: enabled && data === undefined,
   };
 }
 

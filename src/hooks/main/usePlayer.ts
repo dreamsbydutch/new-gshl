@@ -21,12 +21,10 @@ export function usePlayerPages(options: UsePlayerPagesOptions = {}) {
   const { active, positionGroup, enabled = true, limit = 50 } = options;
   const query = usePaginatedQuery(
     api.frontend.playersPage,
-    enabled ? { active } : "skip",
+    enabled ? { active, positionGroup } : "skip",
     { initialNumItems: Math.min(Math.max(limit, 1), 50) },
   );
-  const data = (query.results as unknown as Player[]).filter(
-    (player) => !positionGroup || player.posGroup === positionGroup,
-  );
+  const data = query.results as unknown as Player[];
   return {
     data,
     hasMore: query.status === "CanLoadMore",

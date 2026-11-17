@@ -5,7 +5,6 @@ import { useMemo } from "react";
 import {
   useAuthSession,
   useContracts,
-  useDraftPicks,
   useFranchises,
   usePlayers,
   useSeasonState,
@@ -20,6 +19,7 @@ import type {
   OwnerCommandCenterMatchup,
 } from "@gshl-lib/types/owner-command-center";
 import { buildOwnerCommandCenterView } from "@gshl-utils/features/owner-command-center";
+import { useDraftPicksByTeams } from "../main/useDraftPick";
 import { useUfaOverview } from "./useUfaData";
 
 function seasonYear(season: Pick<Season, "year">) {
@@ -107,9 +107,22 @@ export function useOwnerCommandCenter() {
     filters: ownerId ? { ownerIds: ownerId } : undefined,
     enabled: isLinkedOwner && Boolean(ownerId),
   });
-  const draftPicksQuery = useDraftPicks({
-    enabled: isLinkedOwner && ownerTeams.length > 0,
-  });
+  const draftPicksQuery = useDraftPicksByTeams(
+    ownerTeams
+      .filter((team) => {
+        const season = seasonState.seasons.find(
+          (row) => row.id === team.seasonId,
+        );
+        return (
+          season &&
+          operationalSeason &&
+          seasonYear(season) >= seasonYear(operationalSeason) &&
+          seasonYear(season) <= seasonYear(operationalSeason) + 3
+        );
+      })
+      .map((team) => team.id),
+    isLinkedOwner,
+  );
   const scheduleQuery = useTeamScheduleSummary({
     seasonId: operationalSeason?.id ?? null,
     ownerId,
@@ -120,7 +133,7 @@ export function useOwnerCommandCenter() {
     enabled: isLinkedOwner && Boolean(operationalSeason?.id),
   });
   const tradeQuery = useTradeBlockMarket(isLinkedOwner);
-  const ufaQuery = useUfaOverview("home");
+  const ufaQuery = useUfaOverview("home", isLinkedOwner);
 
   const rawData = useMemo<OwnerCommandCenterData | null>(() => {
     if (!isLinkedOwner || !ownerId || !operationalSeason || !currentTeam) {

@@ -11,6 +11,7 @@ import type { LeagueTradeSummary } from "@gshl-lib/types/trades";
 import {
   formatMoney,
   HOME_LEAGUE_ACTIVITY_QUERY_LIMIT,
+  HOME_LEAGUE_ACTIVITY_PREVIEW_LIMIT,
   selectHomeLeagueActivity,
   showDate,
 } from "@gshl-utils";
@@ -172,7 +173,12 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
     data: activity,
     isLoading,
     error,
-  } = useLeagueActivity(seasonId, HOME_LEAGUE_ACTIVITY_QUERY_LIMIT);
+  } = useLeagueActivity(
+    seasonId,
+    expanded.length
+      ? HOME_LEAGUE_ACTIVITY_QUERY_LIMIT
+      : HOME_LEAGUE_ACTIVITY_PREVIEW_LIMIT + 1,
+  );
   return (
     <section
       aria-labelledby="league-activity-heading"
@@ -247,7 +253,7 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
                       </>
                     ) : (
                       <>
-                        Show {hiddenCount} more{" "}
+                        Show more{" "}
                         <ChevronDown className="h-4 w-4" aria-hidden="true" />
                       </>
                     )}

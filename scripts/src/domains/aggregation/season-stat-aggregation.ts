@@ -1984,6 +1984,37 @@ export function prepareSeasonAggregateWriteRow(
   return next;
 }
 
+/** Non-destructive weekly refreshes only compare the weeks they will write. */
+export async function readAggregatePreimages(
+  modelName: WritableSeasonStatModelName,
+  seasonId: string,
+  rows: DatabaseRecord[],
+  deleteStale: boolean,
+  reads = { fetchAggregateRows, fetchWeekScopedModel },
+): Promise<DatabaseRecord[]> {
+  if (
+    !deleteStale &&
+    (modelName === "PlayerDayStatLine" ||
+      modelName === "PlayerWeekStatLine" ||
+      modelName === "TeamDayStatLine" ||
+      modelName === "TeamWeekStatLine") &&
+    rows.every(
+      (row) =>
+        row.seasonId === seasonId &&
+        typeof row.weekId === "string" &&
+        row.weekId,
+    )
+  ) {
+    return reads.fetchWeekScopedModel(modelName, seasonId, [
+      ...new Set(rows.map((row) => String(row.weekId))),
+    ]);
+  }
+  return reads.fetchAggregateRows(
+    modelName,
+    isCareerPlayerStatModel(modelName) ? undefined : seasonId,
+  );
+}
+
 export async function replaceModelRowsForSeason(
   modelName: WritableSeasonStatModelName,
   seasonId: string,
@@ -2022,9 +2053,11 @@ export async function replaceModelRowsForSeason(
   const normalizedRows = preparedRows.map((row) =>
     prepareSeasonAggregateWriteRow(modelName, row),
   );
-  const existingRows = await fetchAggregateRows<DatabaseRecord>(
+  const existingRows = await readAggregatePreimages(
     modelName,
-    isCareerPlayerStatModel(modelName) ? undefined : seasonId,
+    seasonId,
+    normalizedRows,
+    deleteStale,
   );
   const existingByKey = new Map<string, DatabaseRecord[]>();
   for (const row of existingRows) {

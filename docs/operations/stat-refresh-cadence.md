@@ -6,7 +6,7 @@ The operator runner uses Toronto time with daylight-saving transitions.
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Player days, player weeks, team days, team weeks and their contribution ratings | Hourly during the day; every five minutes during LIVE/CRIT NHL games    |
 | Yahoo rosters and lineup metadata                                               | Hourly, 08:00–22:00, until the scoring date is locked                   |
-| Player splits/totals, team seasons and native/rated careers                     | Overnight, after all active games from the previous scoring date finish |
+| Player splits/totals, team seasons and native/rated careers                     | Weekly, after ended-week corrections and before standings/power publication |
 | NHL player/team season stats and NHL category season ratings                    | Same completed-slate overnight stage                                    |
 
 The five-minute trigger polls public NHL states, then skips work that is not due.
@@ -20,8 +20,13 @@ window. The NHL season end can extend past the fantasy week calendar.
 Frequent calculation reads only affected weeks, retaining prior-date context
 for acquisition flags. It updates the four rating fields together and preserves
 native player-day source cells. Non-live hourly correction passes revisit the
-two most recent open matchups. Overnight GSHL calculation reads the entire season
+two most recent open matchups. Weekly GSHL calculation reads the entire season
 and composes careers from historical season periods plus the fresh current one.
+The existing weekly completion marker gates this work: completed weeks skip it,
+failed rollovers retry it, and multiple overdue weeks share one rebuild. NHL
+source season statistics retain their nightly refresh; GSHL season/career rollups
+are no longer rebuilt by that nightly stage. The explicit operator aggregation
+mode named `overnight` remains available for compatibility and manual rebuilds.
 Eliminated playoff teams do not require fabricated roster days.
 
 The Windows runner has process and task overlap protection and uses the signed-in
