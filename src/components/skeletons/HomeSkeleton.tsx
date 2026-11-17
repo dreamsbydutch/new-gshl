@@ -42,7 +42,7 @@ export function PowerRankingsHomeCardSkeleton() {
         </div>
         <Skeleton className="h-11 w-20 rounded-lg" />
       </header>
-      <div className="px-3 sm:px-5">
+      <div className="mx-auto w-full max-w-sm px-3 sm:px-5">
         {Array.from({ length: 8 }).map((_, index) => (
           <div
             key={index}
@@ -146,13 +146,16 @@ export function HomeSkeleton() {
           </div>
           <section
             className="gshl-section space-y-1"
-            aria-label="Loading standings and power rankings"
+            aria-label="Loading standings"
           >
             <Skeleton className="h-8 w-28" />
             {Array.from({ length: 7 }, (_, index) => (
               <Skeleton key={index} className="mx-auto h-11 w-full max-w-sm" />
             ))}
           </section>
+          <div className="min-w-0">
+            <PowerRankingsHomeCardSkeleton />
+          </div>
           <div className="min-w-0">
             <NHLScheduleHomeCardSkeleton />
           </div>

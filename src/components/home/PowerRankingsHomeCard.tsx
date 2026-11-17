@@ -162,7 +162,7 @@ export function PowerRankingsHomeCard({
       ) : (
         <ol
           aria-label={`Top ${previewEntries.length} power rankings`}
-          className="divide-y divide-slate-100"
+          className="mx-auto w-full max-w-sm divide-y divide-slate-100"
         >
           {previewEntries.map((entry) => (
             <li

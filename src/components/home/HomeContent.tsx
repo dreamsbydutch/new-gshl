@@ -12,6 +12,7 @@ import { NHLScheduleHomeCard } from "./NHLScheduleHomeCard";
 import { DraftHubCard } from "./DraftHubCard";
 import { HomeScoreboard } from "./HomeScoreboard";
 import { StandingsPreview } from "./StandingsPreview";
+import { PowerRankingsHomeCard } from "./PowerRankingsHomeCard";
 import { FreeAgencyNotice } from "./FreeAgencyNotice";
 import { LineupShameCard } from "./LineupShameCard";
 import { OwnerBriefing } from "./OwnerBriefing";
@@ -170,6 +171,11 @@ export function HomeContent() {
         {view.season ? (
           <div className="min-w-0">
             <StandingsPreview seasonId={view.season.id} />
+          </div>
+        ) : null}
+        {view.season ? (
+          <div className="min-w-0">
+            <PowerRankingsHomeCard seasonId={view.season.id} />
           </div>
         ) : null}
         <div className="min-w-0">
