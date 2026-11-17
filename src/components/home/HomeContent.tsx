@@ -184,7 +184,7 @@ export function HomeContent() {
           <NHLScheduleHomeCard />
         </div>
         {view.season ? (
-          <div className="min-w-0 md:col-span-2 lg:col-start-2 lg:row-start-2">
+          <div className="min-w-0 lg:col-start-2 lg:row-start-2">
             <LineupShameCard seasonId={view.season.id} />
           </div>
         ) : null}

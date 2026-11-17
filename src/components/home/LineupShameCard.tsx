@@ -122,10 +122,10 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                   coaching percentages are better.
                 </caption>
                 <colgroup>
-                  <col className="w-10 sm:w-12" />
+                  <col className="w-10" />
                   <col />
-                  <col className="w-20" />
-                  <col className="w-24 sm:w-28" />
+                  <col className="w-10" />
+                  <col className="w-24" />
                 </colgroup>
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
