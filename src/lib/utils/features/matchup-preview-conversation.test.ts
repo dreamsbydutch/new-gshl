@@ -5,6 +5,7 @@ import {
   parseMatchupPreviewConversation,
 } from "./matchup-preview-conversation";
 import { matchupPreviewWriterProfile } from "./matchup-preview-articles";
+import { NEWSROOM_RULEBOOK_CONTEXT } from "./newsroom-rules";
 
 const evidence = {
   writer: "Home Reporter",
@@ -15,6 +16,12 @@ const evidence = {
   startsAt: 1,
   facts: [{ id: "categories", text: "Home leads goals; Away leads hits." }],
 };
+
+void test("matchup reporters receive the official rules and home-ice reporting guidance", () => {
+  const request = buildMatchupPreviewConversationRequest("test", evidence);
+  const input = JSON.parse(request.input) as { RULEBOOK_CONTEXT: unknown };
+  assert.deepEqual(input.RULEBOOK_CONTEXT, NEWSROOM_RULEBOOK_CONTEXT);
+});
 const draft = (count = 4) => ({
   headline: "Scoring meets the heavy game",
   turns: Array.from({ length: count }, (_, index) => ({

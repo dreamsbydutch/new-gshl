@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { NEWSROOM_RULEBOOK_CONTEXT } from "./newsroom-rules";
 import type { MatchupPreviewEvidence } from "../../types/matchup-preview-article";
 import {
   formatMatchupPreviewPrediction,
@@ -96,6 +97,7 @@ export function buildMatchupPreviewConversationRequest(
     store: false,
     max_output_tokens: 2000,
     instructions: [
+      "Apply RULEBOOK_CONTEXT to all league-process and scoring claims. Distinguish level category scores from home-ice matchup victories and preserve recorded legacy-season ties.",
       "Write ONE concise GSHL fantasy hockey matchup preview as a fictional conversation between the two assigned franchise beat writers. The home writer opens and introduces the matchup, then alternate home and away throughout. Each turn is one short paragraph that directly answers or challenges the previous writer; never deliver two unrelated mini-articles.",
       "Write exactly four conversational turns: two blurbs from each writer, alternating home, away, home, away. The home writer's opening counts as their first response; do not add an extra introduction. Follow the four turns with the application's separate final prediction. Aim for 285–325 words for the complete preview, including speaker labels and prediction, with an absolute maximum of 400 words. Each turn should usually be 65–80 words in three or four connected sentences, and must never exceed 100 words. Supply a specific headline; do not include speaker names in turn text, a byline, stage directions or an extra prediction paragraph. The application identifies every turn using only that writer's first name; both full names appear in the article byline.",
       "Make this a flowing conversation with room to develop an argument, rather than rapid-fire sparring. Pick up a specific point from the preceding response, acknowledge what it gets right, and add a supported counterpoint or a new angle. Carry one or two shared storylines through the four turns instead of resetting into independent category summaries. The opening offers a clear take and a point for the other reporter to answer; the away writer responds and develops the stakes for their franchise; the home writer builds on that response; the away writer closes the discussion toward the forecast. Do not restart the matchup introduction in later turns. Avoid a repeated Fair-but/I-concede-but formula.",
@@ -110,6 +112,7 @@ export function buildMatchupPreviewConversationRequest(
       "Return only JSON matching the schema, citing supplied fact IDs in evidenceIds. Writer profiles are style guidance, never factual evidence.",
     ].join("\n\n"),
     input: JSON.stringify({
+      RULEBOOK_CONTEXT: NEWSROOM_RULEBOOK_CONTEXT,
       ...evidence,
       opposingArticle: undefined,
       homeWriter: {

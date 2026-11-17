@@ -77,7 +77,7 @@ export function matchupSummary(matchup: WeeklyEditionMatchupFact) {
   if (!matchup.winnerTeamName) {
     return `${stagePrefix}${matchup.homeTeamName} and ${matchup.awayTeamName} finished level at ${matchup.homeScore}–${matchup.awayScore}.`;
   }
-  return `${stagePrefix}${matchup.winnerTeamName} beat ${matchup.loserTeamName} ${Math.max(matchup.homeScore, matchup.awayScore)}–${Math.min(matchup.homeScore, matchup.awayScore)}.${categorySentence}`;
+  return `${stagePrefix}${matchup.winnerTeamName} beat ${matchup.loserTeamName} ${Math.max(matchup.homeScore, matchup.awayScore)}–${Math.min(matchup.homeScore, matchup.awayScore)}${matchup.homeScore === matchup.awayScore ? " on home-ice advantage" : ""}.${categorySentence}`;
 }
 
 export function pressBoxEditorialCandidates(packet: WeeklyEditionFactPacket) {

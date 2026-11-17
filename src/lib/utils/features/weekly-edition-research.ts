@@ -104,6 +104,7 @@ export function teamResultEvidence(
     homeScore: number;
     awayScore: number;
   }[],
+  usesLegacyTies = false,
 ): WeeklyEditionEditorialCandidate[] {
   return teams.flatMap((team) => {
     const games = results
@@ -120,7 +121,8 @@ export function teamResultEvidence(
       const margin =
         (game.homeScore - game.awayScore) *
         (game.homeTeamId === team.teamId ? 1 : -1);
-      return margin > 0 ? "W" : margin < 0 ? "L" : "T";
+      if (margin !== 0) return margin > 0 ? "W" : "L";
+      return usesLegacyTies ? "T" : game.homeTeamId === team.teamId ? "W" : "L";
     });
     const wins = outcomes.filter((outcome) => outcome === "W").length;
     const losses = outcomes.filter((outcome) => outcome === "L").length;
@@ -135,11 +137,13 @@ export function teamResultEvidence(
         teamId: team.teamId,
         teamName: team.name,
         headlineHint: `${team.name}: results and recent form`,
-        summary: `${team.name} has ${wins} wins, ${losses} losses and ${ties} ties in ${games.length} completed regular-season matchups through week ${games.at(-1)!.weekNumber}. Latest ${recent.length} results, oldest first: ${recent.join(", ")}. This is a win-loss record, not a category-points standings position.`,
+        summary: `${team.name} has ${wins} wins, ${losses} losses${usesLegacyTies ? ` and ${ties} ties` : ""} in ${games.length} completed regular-season matchups through week ${games.at(-1)!.weekNumber}. Latest ${recent.length} results, oldest first: ${recent.join(", ")}. ${usesLegacyTies ? "This season uses legacy ties." : "Home-ice victories count as wins and home-ice defeats count as losses; there are no matchup draws."} This is a win-loss record, not a standings position.`,
         metrics: [
           { key: "wins", label: "Regular-season wins", value: wins },
           { key: "losses", label: "Regular-season losses", value: losses },
-          { key: "ties", label: "Regular-season ties", value: ties },
+          ...(usesLegacyTies
+            ? [{ key: "ties", label: "Regular-season ties", value: ties }]
+            : []),
         ],
         links: [],
       },

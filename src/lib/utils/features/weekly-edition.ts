@@ -1,4 +1,5 @@
 import { isCategoryImpactRating } from "./stat-rating";
+import { NEWSROOM_RULEBOOK_CONTEXT } from "./newsroom-rules";
 import {
   gshlPerformanceRating,
   GSHL_PERFORMANCE_RATING_VERSION,
@@ -437,8 +438,11 @@ export function buildWeeklyEditionCategoryMargins({
 
 function winnerForMatchup(
   matchup: Omit<WeeklyEditionMatchupFact, "rankUpset">,
+  usesLegacyTies = false,
 ): WeeklyEditionMatchupFact {
-  const homeWon = matchup.homeScore > matchup.awayScore;
+  const homeWon =
+    matchup.homeScore > matchup.awayScore ||
+    (matchup.homeScore === matchup.awayScore && !usesLegacyTies);
   const awayWon = matchup.awayScore > matchup.homeScore;
   const winnerTeamId = homeWon
     ? matchup.homeTeamId
@@ -463,7 +467,7 @@ function winnerForMatchup(
   const winnerRank = homeWon ? matchup.homeRank : matchup.awayRank;
   const loserRank = homeWon ? matchup.awayRank : matchup.homeRank;
   const rankUpset =
-    winnerRank !== undefined && loserRank !== undefined
+    (homeWon || awayWon) && winnerRank !== undefined && loserRank !== undefined
       ? Math.max(0, winnerRank - loserRank)
       : 0;
   return {
@@ -1071,7 +1075,9 @@ export function buildWeeklyEditionEditorialCandidates(
 export function buildWeeklyEditionFactPacket(
   input: BuildWeeklyEditionFactPacketInput,
 ): WeeklyEditionFactPacket {
-  const matchups = input.matchups.map(winnerForMatchup);
+  const matchups = input.matchups.map((matchup) =>
+    winnerForMatchup(matchup, input.season.usesLegacyTies),
+  );
   const hero = selectHeroMatchup(matchups);
   if (matchups.length === 0) throw new Error("A completed matchup is required");
 
@@ -1159,7 +1165,9 @@ function buildMilestoneEditorialCandidates(
   input: BuildMilestoneEditionFactPacketInput,
 ) {
   if (input.issueType === "final_recap") {
-    const matchups = (input.matchups ?? []).map(winnerForMatchup);
+    const matchups = (input.matchups ?? []).map((matchup) =>
+      winnerForMatchup(matchup, input.season.usesLegacyTies),
+    );
     const candidates = buildWeeklyEditionEditorialCandidates(
       {
         season: input.season,
@@ -1508,7 +1516,9 @@ function buildMilestoneEditorialCandidates(
 export function buildMilestoneEditionFactPacket(
   input: BuildMilestoneEditionFactPacketInput,
 ): WeeklyEditionFactPacket {
-  const matchups = (input.matchups ?? []).map(winnerForMatchup);
+  const matchups = (input.matchups ?? []).map((matchup) =>
+    winnerForMatchup(matchup, input.season.usesLegacyTies),
+  );
   const hero = matchups.length > 0 ? selectHeroMatchup(matchups) : undefined;
   const stars = (input.stars ?? [])
     .map((player) => ({
@@ -2799,6 +2809,8 @@ export function buildWeeklyEditionRuleContext(packet: WeeklyEditionFactPacket) {
   };
 
   const common = {
+    officialRulebook: NEWSROOM_RULEBOOK_CONTEXT,
+    usesLegacyTies: packet.season.usesLegacyTies === true,
     editorialFocus: buildWeeklyEditionEditorialFocus(packet),
     authority:
       "This RULEBOOK_CONTEXT is authoritative. EDITION_FACTS is authoritative for people, teams, amounts, dates and events. If either source does not establish a claim, write it conditionally or say it is unknown.",
