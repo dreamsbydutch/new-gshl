@@ -274,7 +274,7 @@ void test("team draft picks never fall back to an unscoped read", (t) => {
   ids = ["team", "team"];
   h.rerender();
   assert.equal(h.caught, undefined);
-  const args = h.transport.mock.calls.at(-1)?.arguments[1];
+  const args: unknown = h.transport.mock.calls.at(-1)?.arguments[1];
   assert.deepEqual(args, { where: { teamId: "team" } });
   h.publish("frontend:draftPicks", [{ id: "pick" }]);
   assert.equal(h.current.data.length, 1);
@@ -295,4 +295,25 @@ void test("activity preview requests six per type and expands only on demand", (
     take: 12,
     grouped: true,
   });
+});
+
+void test("activity expansion keeps its preview mounted and never carries it into another season", (t) => {
+  let take = 6;
+  let seasonId = "first";
+  const h = mount(t, () => useLeagueActivity(seasonId, take));
+  const preview = [{ id: "event", type: "add" }];
+  h.publish("frontend:activity", preview);
+  take = 12;
+  h.rerender();
+  h.publish("frontend:activity", undefined);
+  assert.equal(h.current.data, preview);
+  assert.equal(
+    h.current.isLoading,
+    false,
+    "keep controls mounted during expansion",
+  );
+  seasonId = "second";
+  h.rerender();
+  assert.deepEqual(h.current.data, []);
+  assert.equal(h.current.isLoading, true);
 });

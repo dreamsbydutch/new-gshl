@@ -83,7 +83,9 @@ test("publication follows results, power and standings and never follows a failu
   const events: string[] = [];
   let failPower = true;
   const stages = {
-    aggregates: async () => { events.push("aggregates"); },
+    aggregates: async () => {
+      events.push("aggregates");
+    },
     standings: async () => {
       events.push("standings");
     },
@@ -103,7 +105,13 @@ test("publication follows results, power and standings and never follows a failu
   assert.deepEqual(events, ["aggregates", "standings", "power", "standings"]);
   events.length = 0;
   await runWeeklyRollover(stages, true);
-  assert.deepEqual(events, ["aggregates", "standings", "power", "standings", "publish"]);
+  assert.deepEqual(events, [
+    "aggregates",
+    "standings",
+    "power",
+    "standings",
+    "publish",
+  ]);
 });
 
 test("3am provisional rollover stays correctable and retries hourly until noon", () => {
@@ -166,25 +174,49 @@ test("aggregate failure blocks standings and publication, then retries before ei
   const calls: string[] = [];
   let fail = true;
   const stages = {
-    aggregates: async () => { calls.push("aggregates"); if (fail) throw Error("aggregate failure"); },
-    standings: async () => { calls.push("standings"); },
-    power: async () => { calls.push("power"); },
-    publish: async () => { calls.push("publish"); },
+    aggregates: async () => {
+      calls.push("aggregates");
+      if (fail) throw Error("aggregate failure");
+    },
+    standings: async () => {
+      calls.push("standings");
+    },
+    power: async () => {
+      calls.push("power");
+    },
+    publish: async () => {
+      calls.push("publish");
+    },
   };
   await assert.rejects(runWeeklyRollover(stages, true), /aggregate failure/);
   assert.deepEqual(calls, ["aggregates"]);
   fail = false;
   await runWeeklyRollover(stages, true);
-  assert.deepEqual(calls, ["aggregates", "aggregates", "standings", "power", "standings", "publish"]);
+  assert.deepEqual(calls, [
+    "aggregates",
+    "aggregates",
+    "standings",
+    "power",
+    "standings",
+    "publish",
+  ]);
 });
 
 test("hourly provisional refreshes do not rebuild season aggregates", async () => {
   const calls: string[] = [];
   const stages = {
-    aggregates: async () => { calls.push("aggregates"); },
-    standings: async () => { calls.push("standings"); },
-    power: async () => { calls.push("power"); },
-    publish: async () => { calls.push("publish"); },
+    aggregates: async () => {
+      calls.push("aggregates");
+    },
+    standings: async () => {
+      calls.push("standings");
+    },
+    power: async () => {
+      calls.push("power");
+    },
+    publish: async () => {
+      calls.push("publish");
+    },
   };
   await runWeeklyRollover(stages, true, true);
   assert.deepEqual(calls, ["standings", "power", "standings", "publish"]);

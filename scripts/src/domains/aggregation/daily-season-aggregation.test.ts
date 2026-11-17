@@ -441,3 +441,27 @@ test("unknown, empty or overnight week scope fails before rating or publication"
     assert.equal(f.scored.length + f.patches.length + f.writes.length, 0);
   }
 });
+
+test("weekly publication computes full totals without writing finalized day/week rows", async () => {
+  const f = fixture();
+  await refreshDailySeasonAggregates(
+    season,
+    true,
+    undefined,
+    { mode: "overnight", publishSeasonOnly: true },
+    f.dependencies,
+  );
+  assert.deepEqual(f.patches, []);
+  assert.deepEqual(
+    f.writes.map((row) => row.model),
+    [
+      "PlayerSplitStatLine",
+      "PlayerTotalStatLine",
+      "TeamSeasonStatLine",
+      "PlayerCareerSplitStatLine",
+      "PlayerCareerTotalStatLine",
+    ],
+  );
+  assert.ok(f.reads.includes("PlayerDayStatLine:s"));
+  assert.ok(f.writes.every((row) => row.deleteStale === false));
+});

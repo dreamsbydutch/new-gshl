@@ -2061,4 +2061,3 @@ export async function runDailyNhlPlayerStatSync(
     aggregateSummary,
   };
 }
-

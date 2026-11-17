@@ -7,7 +7,7 @@ The operator runner uses Toronto time with daylight-saving transitions.
 | Player days, player weeks, team days, team weeks and their contribution ratings | Hourly during the day; every five minutes during LIVE/CRIT NHL games    |
 | Yahoo rosters and lineup metadata                                               | Hourly, 08:00–22:00, until the scoring date is locked                   |
 | Player splits/totals, team seasons and native/rated careers                     | Weekly, after ended-week corrections and before standings/power publication |
-| NHL player/team season stats and NHL category season ratings                    | Same completed-slate overnight stage                                    |
+| NHL player/team season stats and NHL category season ratings                    | Nightly, after the previous scoring slate finishes                                    |
 
 The five-minute trigger polls public NHL states, then skips work that is not due.
 It excludes All-Star and preseason games. After midnight it checks both calendar
@@ -23,7 +23,9 @@ native player-day source cells. Non-live hourly correction passes revisit the
 two most recent open matchups. Weekly GSHL calculation reads the entire season
 and composes careers from historical season periods plus the fresh current one.
 The existing weekly completion marker gates this work: completed weeks skip it,
-failed rollovers retry it, and multiple overdue weeks share one rebuild. NHL
+failed rollovers retry it, and multiple overdue weeks share one rebuild. Hourly
+provisional rollovers skip this rebuild. Its publication changes only season and
+career rows; the preceding correction pass owns eligible day/week writes. NHL
 source season statistics retain their nightly refresh; GSHL season/career rollups
 are no longer rebuilt by that nightly stage. The explicit operator aggregation
 mode named `overnight` remains available for compatibility and manual rebuilds.

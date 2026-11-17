@@ -215,9 +215,18 @@ async function main() {
   await runWeeklyRollover(
     {
       aggregates: async () => {
-        console.log(JSON.stringify(await refreshDailySeasonAggregates(
-          season as DatabaseRecord & { id: string }, !!values.apply, undefined, { mode: "overnight" },
-        ), null, 2));
+        console.log(
+          JSON.stringify(
+            await refreshDailySeasonAggregates(
+              season as DatabaseRecord & { id: string },
+              !!values.apply,
+              undefined,
+              { mode: "overnight", publishSeasonOnly: true },
+            ),
+            null,
+            2,
+          ),
+        );
       },
       standings: async () => {
         run("standings/backfill-season-standings.ts");
