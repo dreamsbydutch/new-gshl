@@ -79,7 +79,7 @@ export function prioritizeHomeActivity(
       b.date.localeCompare(a.date) ||
       a.id.localeCompare(b.id),
   );
-  return groupLeagueActivity(sorted).slice(0, 6);
+  return groupLeagueActivity(sorted);
 }
 
 export function matchupProgress(

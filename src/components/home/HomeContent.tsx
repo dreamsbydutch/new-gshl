@@ -1,11 +1,10 @@
 "use client";
 
-import Image from "next/image";
+import { ActivityTeamGroup } from "./ActivityTeamGroup";
 import Link from "next/link";
-import { Bell, ChevronRight, Plus, Minus, ArrowLeftRight } from "lucide-react";
+import { Bell, ChevronRight } from "lucide-react";
 import { useHomeDashboard } from "@gshl-hooks/features/useHomeDashboard";
 import { HomeSkeleton } from "@gshl-skeletons";
-import { showDate } from "@gshl-utils";
 import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
 import { SectionHeading } from "@gshl-components/ui/SectionHeading";
 import { MasonryGrid } from "@gshl-components/ui/MasonryGrid";
@@ -86,7 +85,7 @@ export function HomeContent() {
         >
           <SectionHeading
             id="rundown-updates-heading"
-            title={owner ? "Updates for you" : "League activity"}
+            title="Today's league activity"
             href="/activity"
             action="View all"
           />
@@ -98,103 +97,18 @@ export function HomeContent() {
             <ul className="mx-auto w-full max-w-sm divide-y divide-slate-100">
               {view.activity.map((group) => (
                 <li key={group.id}>
-                  <Link
+                  <ActivityTeamGroup
+                    group={group}
                     href={view.teamHref(group.teamId)}
-                    className="flex min-h-11 items-start gap-2 py-2 focus-visible:ring-2 focus-visible:ring-slate-500"
-                    title={group.teamName || "League transaction"}
-                  >
-                    {group.teamLogoUrl ? (
-                      <Image
-                        src={group.teamLogoUrl}
-                        alt=""
-                        width={32}
-                        height={32}
-                        className="mt-1 h-8 w-8 shrink-0 object-contain"
-                      />
-                    ) : (
-                      <span
-                        className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[9px] font-semibold text-slate-600"
-                        aria-hidden="true"
-                      >
-                        {group.teamAbbr}
-                      </span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2 pb-1">
-                        <span
-                          className="min-w-0 truncate text-xs font-semibold text-slate-600"
-                          title={group.teamName}
-                        >
-                          <span className="sr-only">
-                            {group.teamId === owner?.team?.id
-                              ? "Your team ? "
-                              : group.teamId === view.matchup?.opponent?.id
-                                ? "Your opponent ? "
-                                : ""}
-                          </span>
-                          {group.teamName || "Trade"}
-                        </span>
-                        <time
-                          dateTime={group.date}
-                          className="shrink-0 text-[10px] text-slate-500"
-                        >
-                          {showDate(group.date)}
-                        </time>
-                      </div>
-                      <ul className="space-y-1">
-                        {group.events.map((event) => (
-                          <li
-                            key={event.id}
-                            className="flex items-start gap-1.5"
-                          >
-                            <span
-                              title={
-                                event.type === "add"
-                                  ? "Added"
-                                  : event.type === "drop"
-                                    ? "Dropped"
-                                    : event.type
-                              }
-                              className={
-                                event.type === "add"
-                                  ? "mt-0.5 text-emerald-600"
-                                  : event.type === "drop"
-                                    ? "mt-0.5 text-rose-600"
-                                    : "mt-0.5 text-slate-500"
-                              }
-                            >
-                              {event.type === "add" ? (
-                                <Plus className="h-4 w-4" aria-hidden="true" />
-                              ) : event.type === "drop" ? (
-                                <Minus className="h-4 w-4" aria-hidden="true" />
-                              ) : (
-                                <ArrowLeftRight
-                                  className="h-4 w-4"
-                                  aria-hidden="true"
-                                />
-                              )}
-                            </span>
-                            <span className="min-w-0 break-words text-sm font-semibold">
-                              <span className="sr-only">
-                                {event.type === "add"
-                                  ? "Added: "
-                                  : event.type === "drop"
-                                    ? "Dropped: "
-                                    : event.type + ": "}
-                              </span>
-                              {event.playerName || event.teamName}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </Link>
+                    ownId={owner?.team?.id}
+                    opponentId={view.matchup?.opponent?.id}
+                  />
                 </li>
               ))}
             </ul>
           ) : (
             <p className="py-5 text-sm text-slate-500">
-              No recent league activity.
+              No league activity today.
             </p>
           )}
         </section>

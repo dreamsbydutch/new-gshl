@@ -58,3 +58,46 @@ void test("Home query retains a complete team day in live and archived activity"
   assert.deepEqual(await read(true), complete);
   assert.equal((await read(false)).length, 2);
 });
+
+void test("date windows return every transaction for the requested days, without truncation", async () => {
+  const f = mutationFixture();
+  const seasonId = "season";
+  f.put("franchises", "franchise", { name: "Team", ownerId: "owner" });
+  f.put("teams", "team", { seasonId, franchiseId: "franchise" });
+  for (const date of ["2026-11-14", "2026-11-15"]) {
+    for (let index = 0; index < 40; index++) {
+      const playerId = "player-" + index;
+      f.put("players", playerId, { fullName: playerId });
+      f.put("playerDayStatLines", date + playerId, {
+        seasonId,
+        date,
+        playerId,
+        gshlTeamId: "team",
+        ADD: 1,
+      });
+    }
+  }
+  const readWindow = (end: string, days: 1 | 7) =>
+    invokeMutation(activity, f.ctx, {
+      seasonId,
+      take: 1,
+      grouped: true,
+      window: { end, days },
+    }) as Promise<LeagueActivityEvent[]>;
+  const check = async () => {
+    const day = await readWindow("2026-11-15", 1);
+    assert.equal(day.length, 40);
+    assert(day.every((e) => e.date === "2026-11-15"));
+    assert.deepEqual(await readWindow("2026-11-16", 1), []);
+    const week = await readWindow("2026-11-16", 7);
+    assert.equal(week.length, 80);
+    return week;
+  };
+  const activitySnapshot = await check();
+  f.put("seasonDataArchives", "archive", {
+    seasonId,
+    status: "archived",
+    activitySnapshot: activitySnapshot.slice(0, 30),
+  });
+  assert.equal((await readWindow("2026-11-15", 1)).length, 30);
+});

@@ -92,7 +92,7 @@ function TradeActivityRow({ trade }: { trade: LeagueTradeSummary }) {
   );
 }
 
-function ActivityRow({
+export function ActivityRow({
   event,
   canShare,
 }: {

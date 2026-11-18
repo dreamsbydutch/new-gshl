@@ -77,7 +77,7 @@ void test("the rundown prioritizes your team, opponent and contenders without mu
   );
 });
 
-void test("Home limits team-day groups, keeping every add and drop in a selected group", () => {
+void test("Home includes every team-day group and every move", () => {
   const events: LeagueActivityEvent[] = Array.from({ length: 9 }, (_, i) => ({
     id: `move-${i}`,
     type: i < 5 ? "add" : "drop",
@@ -98,7 +98,7 @@ void test("Home limits team-day groups, keeping every add and drop in a selected
   );
   const before = structuredClone(events);
   const groups = prioritizeHomeActivity(events, "own");
-  assert.equal(groups.length, 6);
+  assert.equal(groups.length, 8);
   assert.equal(groups[0]?.events.length, 9);
   assert.equal(
     groups[0]?.events.filter((event) => event.type === "drop").length,

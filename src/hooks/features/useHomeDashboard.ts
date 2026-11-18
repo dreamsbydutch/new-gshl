@@ -5,6 +5,7 @@ import {
   useSeasonState,
   useTeamScheduleStats,
 } from "../main";
+import { useLeagueToday } from "./useLeagueToday";
 import { useOwnerCommandCenter } from "./useOwnerCommandCenter";
 import { useStandingsData } from "./useStandingsData";
 import {
@@ -27,7 +28,11 @@ export function useHomeDashboard() {
   const rankIndex = teams.findIndex((team) => team.id === own?.team?.id);
   const standing = teams[rankIndex];
   const matchup = own?.matchup.current ?? own?.matchup.next ?? null;
-  const activity = useLeagueActivity(season?.id, 30, true);
+  const today = useLeagueToday();
+  const activity = useLeagueActivity(season?.id, 30, false, {
+    end: today,
+    days: 1,
+  });
   const stats = useTeamScheduleStats({
     seasonId: season?.id ?? "",
     weekId: matchup?.weekId ?? "",
