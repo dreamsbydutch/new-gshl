@@ -56,7 +56,7 @@ export function StandingsPreview({ seasonId }: { seasonId: string }) {
           <p className="py-1 text-center text-[10px] text-slate-500">
             <span
               aria-hidden="true"
-              className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-100"
+              className="mr-1 inline-block h-2 w-2 rounded-sm bg-slate-200"
             />
             Playoff position
           </p>
@@ -122,7 +122,7 @@ export function StandingsPreview({ seasonId }: { seasonId: string }) {
                     return (
                       <li
                         key={team.id}
-                        className={qualifies ? "bg-emerald-50" : undefined}
+                        className={qualifies ? "bg-slate-100" : undefined}
                       >
                         <Link
                           href={

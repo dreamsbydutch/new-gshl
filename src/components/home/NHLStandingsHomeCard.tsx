@@ -46,7 +46,7 @@ export function NHLStandingsHomeCard({
               <span className="mr-2">
                 <span
                   aria-hidden="true"
-                  className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-100"
+                  className="mr-1 inline-block h-2 w-2 rounded-sm bg-slate-200"
                 />
                 Playoff position
               </span>
@@ -101,7 +101,7 @@ export function NHLStandingsHomeCard({
                       <li
                         key={team.teamAbbrev.default}
                         title={`${team.teamName.default}: ${team.points} points${qualifies ? ", in playoff position" : ""}`}
-                        className={`grid h-8 grid-cols-[1.5rem_1.25rem] items-center justify-center gap-1 text-[10px] tabular-nums sm:h-10 sm:grid-cols-[2rem_1.25rem] ${qualifies ? "bg-emerald-50" : ""}`}
+                        className={`grid h-8 grid-cols-[1.5rem_1.25rem] items-center justify-center gap-1 text-[10px] tabular-nums sm:h-10 sm:grid-cols-[2rem_1.25rem] ${qualifies ? "bg-slate-100" : ""}`}
                       >
                         <span className="sr-only">
                           {team.teamName.default},{" "}
