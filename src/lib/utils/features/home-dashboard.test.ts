@@ -15,6 +15,34 @@ import {
   matchupProgress,
 } from "./home-dashboard";
 import type { LeagueActivityEvent } from "../../types/league-activity";
+import { limitLeagueActivity } from "./league-activity";
+
+void test("complete Home groups retain an owner trade behind a busy signing feed", () => {
+  const events: LeagueActivityEvent[] = Array.from({ length: 30 }, (_, i) => ({
+    id: `sign-${i}`,
+    type: "signing",
+    date: "2026-11-15",
+    teamId: "other",
+    teamName: "Other",
+    teamLogoUrl: null,
+    teamAbbr: null,
+    playerId: `p${i}`,
+    playerName: `Player ${i}`,
+  }));
+  events.push({
+    ...events[0]!,
+    id: "owner-trade",
+    type: "trade",
+    date: "2026-11-14",
+    teamId: "own",
+  });
+  const candidates = limitLeagueActivity(events, 30, true, true);
+  assert.equal(candidates.length, 31);
+  assert.equal(
+    prioritizeHomeActivity(candidates, "own")[0]?.events[0]?.id,
+    "owner-trade",
+  );
+});
 
 void test("the rundown prioritizes your team, opponent and contenders without mutating league activity", () => {
   const events: LeagueActivityEvent[] = [
@@ -42,9 +70,41 @@ void test("the rundown prioritizes your team, opponent and contenders without mu
   );
   assert.deepEqual(events, before);
   assert.deepEqual(
-    prioritizeHomeActivity(events).map((event) => event.id),
+    prioritizeHomeActivity(events).flatMap((group) =>
+      group.events.map((event) => event.id),
+    ),
     ["0", "1", "2", "3"],
   );
+});
+
+void test("Home limits team-day groups, keeping every add and drop in a selected group", () => {
+  const events: LeagueActivityEvent[] = Array.from({ length: 9 }, (_, i) => ({
+    id: `move-${i}`,
+    type: i < 5 ? "add" : "drop",
+    date: "2026-11-15",
+    playerId: `p${i}`,
+    playerName: `Player ${i}`,
+    teamId: "own",
+    teamName: "Owner",
+    teamAbbr: null,
+    teamLogoUrl: null,
+  }));
+  events.push(
+    ...Array.from({ length: 7 }, (_, i) => ({
+      ...events[0]!,
+      id: `other-${i}`,
+      teamId: `other-${i}`,
+    })),
+  );
+  const before = structuredClone(events);
+  const groups = prioritizeHomeActivity(events, "own");
+  assert.equal(groups.length, 6);
+  assert.equal(groups[0]?.events.length, 9);
+  assert.equal(
+    groups[0]?.events.filter((event) => event.type === "drop").length,
+    4,
+  );
+  assert.deepEqual(events, before);
 });
 
 void test("matchup progress handles absent schedules and includes the end date", () => {

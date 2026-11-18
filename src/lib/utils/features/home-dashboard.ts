@@ -50,6 +50,7 @@ export function selectHomeUfaPreview<T>(entries: readonly T[]): T[] {
 }
 
 import type { LeagueActivityEvent } from "../../types/league-activity";
+import { groupLeagueActivity } from "./league-activity";
 
 export function prioritizeHomeActivity(
   events: readonly LeagueActivityEvent[],
@@ -72,14 +73,13 @@ export function prioritizeHomeActivity(
         : contenderIds.some((id) => involved(event, id))
           ? 2
           : 3;
-  return [...events]
-    .sort(
-      (a, b) =>
-        priority(a) - priority(b) ||
-        b.date.localeCompare(a.date) ||
-        a.id.localeCompare(b.id),
-    )
-    .slice(0, 6);
+  const sorted = [...events].sort(
+    (a, b) =>
+      priority(a) - priority(b) ||
+      b.date.localeCompare(a.date) ||
+      a.id.localeCompare(b.id),
+  );
+  return groupLeagueActivity(sorted).slice(0, 6);
 }
 
 export function matchupProgress(

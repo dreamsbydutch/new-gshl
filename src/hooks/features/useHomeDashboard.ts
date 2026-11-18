@@ -27,7 +27,7 @@ export function useHomeDashboard() {
   const rankIndex = teams.findIndex((team) => team.id === own?.team?.id);
   const standing = teams[rankIndex];
   const matchup = own?.matchup.current ?? own?.matchup.next ?? null;
-  const activity = useLeagueActivity(season?.id, 30);
+  const activity = useLeagueActivity(season?.id, 30, true);
   const stats = useTeamScheduleStats({
     seasonId: season?.id ?? "",
     weekId: matchup?.weekId ?? "",

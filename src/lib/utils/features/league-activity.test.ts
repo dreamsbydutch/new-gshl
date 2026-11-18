@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ContractStatus } from "../domain/constants";
-import { buildLeagueActivity } from "./league-activity";
+import {
+  buildLeagueActivity,
+  groupLeagueActivity,
+  limitLeagueActivity,
+} from "./league-activity";
+import type { LeagueActivityEvent } from "../../types/league-activity";
 import type { LeagueTradeSummary } from "../../types/trades";
 
 const players = [
@@ -32,6 +37,63 @@ const teams = [
   { id: "t1", seasonId: "s1", franchiseId: "f1" },
   { id: "t2", seasonId: "s1", franchiseId: "f2" },
 ];
+
+void test("roster moves group by team and day without mixing transactions or unknown teams", () => {
+  const event = (
+    id: string,
+    type: LeagueActivityEvent["type"],
+    teamId: string | null = "t1",
+    date = "2026-11-15",
+  ): LeagueActivityEvent => ({
+    id,
+    type,
+    teamId,
+    date,
+    teamName: teamId ?? "Unknown team",
+    teamAbbr: null,
+    teamLogoUrl: null,
+    playerId: id,
+    playerName: id,
+  });
+  const events = [
+    event("a", "add"),
+    event("b", "add"),
+    event("c", "drop"),
+    event("d", "drop"),
+    event("e", "add", "t2"),
+    event("f", "add", "t2"),
+    event("g", "drop", "t2"),
+    event("yesterday", "add", "t1", "2026-11-14"),
+    event("sign", "signing"),
+    event("trade", "trade"),
+    event("unknown1", "add", null),
+    event("unknown2", "drop", null),
+  ];
+  const before = structuredClone(events);
+  const groups = groupLeagueActivity(events);
+  assert.deepEqual(
+    groups.map((g) => g.events.map((e) => e.id)),
+    [
+      ["a", "b", "c", "d"],
+      ["e", "f", "g"],
+      ["yesterday"],
+      ["sign"],
+      ["trade"],
+      ["unknown1"],
+      ["unknown2"],
+    ],
+  );
+  assert.deepEqual(
+    limitLeagueActivity(events, 1, true, true).map((e) => e.id),
+    ["a", "b", "c", "d", "sign", "trade"],
+  );
+  assert.deepEqual(
+    limitLeagueActivity(events, 1, true).map((e) => e.id),
+    ["a", "c", "sign", "trade"],
+  );
+  assert.deepEqual(events, before);
+  assert.deepEqual(groupLeagueActivity([]), []);
+});
 
 void test("an old trade already visible on the receiver cannot hide a later drop from the sender", () => {
   const trade: LeagueTradeSummary = {

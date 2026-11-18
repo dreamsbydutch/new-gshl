@@ -5,11 +5,20 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
-export function useLeagueActivity(seasonId?: string, take = 12) {
+export function useLeagueActivity(
+  seasonId?: string,
+  take = 12,
+  completeTeamDays = false,
+) {
   const data = useQuery(
     api.frontend.activity,
     seasonId
-      ? { seasonId: seasonId as Id<"seasons">, take, grouped: true }
+      ? {
+          seasonId: seasonId as Id<"seasons">,
+          take,
+          grouped: true,
+          ...(completeTeamDays ? { completeTeamDays: true } : {}),
+        }
       : "skip",
   );
 

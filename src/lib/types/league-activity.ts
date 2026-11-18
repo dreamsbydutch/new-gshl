@@ -23,3 +23,13 @@ export interface LeagueActivityEvent {
   contractLength?: number;
   contractSalary?: number;
 }
+
+export interface LeagueActivityGroup {
+  id: string;
+  date: string;
+  teamId: string | null;
+  teamName: string;
+  teamAbbr: string | null;
+  teamLogoUrl: string | null;
+  events: LeagueActivityEvent[];
+}

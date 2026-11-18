@@ -1289,6 +1289,7 @@ export const activity = query({
     seasonId: v.id("seasons"),
     take: v.number(),
     grouped: v.optional(v.boolean()),
+    completeTeamDays: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const archived = await ctx.db
@@ -1300,6 +1301,7 @@ export const activity = query({
         archived.activitySnapshot,
         Math.min(Math.max(args.take, 1), 30),
         args.grouped === true,
+        args.completeTeamDays === true,
       ) as ReturnType<typeof buildLeagueActivity>;
     }
     const weeks = await rows(ctx, "weeks", { where: { seasonId: args.seasonId } });
@@ -1380,6 +1382,7 @@ export const activity = query({
       limit: Math.min(Math.max(args.take, 1), 30),
       weeks,
       perTypeLimit: args.grouped === true,
+      completeTeamDays: args.completeTeamDays === true,
       rosterStartDate: start,
       trades: trades.map(projectTrade),
     });

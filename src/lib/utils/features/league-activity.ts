@@ -13,6 +13,7 @@ import { ContractStatus } from "../domain/constants";
 import { normalizeDateOnlyValue } from "../core/date";
 import { toNumber } from "../core/data";
 import type { LeagueTradeSummary } from "../../types/trades";
+import type { LeagueActivityGroup } from "../../types/league-activity";
 
 type ContractSource = Pick<
   Contract,
@@ -44,6 +45,7 @@ interface BuildLeagueActivityOptions {
   franchises: FranchiseSource[];
   weeks?: Pick<Week, "id" | "startDate" | "endDate">[];
   perTypeLimit?: boolean;
+  completeTeamDays?: boolean;
   rosterStartDate?: string;
   trades?: readonly LeagueTradeSummary[];
   limit?: number;
@@ -75,7 +77,22 @@ export function limitLeagueActivity(
   events: readonly LeagueActivityEvent[],
   limit: number,
   perType: boolean,
+  completeTeamDays = false,
 ): LeagueActivityEvent[] {
+  if (completeTeamDays) {
+    const selectedIds = new Set(
+      limitLeagueActivity(events, limit, perType).map((event) => event.id),
+    );
+    return groupLeagueActivity(
+      perType
+        ? events.filter((event) => event.type !== "missed_start")
+        : events,
+    )
+      .filter((group) =>
+        group.events.some((event) => selectedIds.has(event.id)),
+      )
+      .flatMap((group) => group.events);
+  }
   if (!perType) return events.slice(0, Math.max(0, limit));
   const counts = new Map<LeagueActivityType, number>();
   return events.filter((event) => {
@@ -86,6 +103,33 @@ export function limitLeagueActivity(
   });
 }
 
+/** Combine only roster moves for the same team and stored calendar day. */
+export function groupLeagueActivity(
+  events: readonly LeagueActivityEvent[],
+): LeagueActivityGroup[] {
+  const groups = new Map<string, LeagueActivityGroup>();
+  for (const event of events) {
+    const id =
+      event.teamId && (event.type === "add" || event.type === "drop")
+        ? `roster:${event.teamId}:${event.date}`
+        : `event:${event.id}`;
+    const existing = groups.get(id);
+    if (existing) existing.events.push(event);
+    else {
+      groups.set(id, {
+        id,
+        date: event.date,
+        teamId: event.teamId,
+        teamName: event.teamName,
+        teamAbbr: event.teamAbbr,
+        teamLogoUrl: event.teamLogoUrl,
+        events: [event],
+      });
+    }
+  }
+  return [...groups.values()];
+}
+
 export function buildLeagueActivity({
   contracts,
   playerDays,
@@ -94,6 +138,7 @@ export function buildLeagueActivity({
   franchises,
   weeks = [],
   perTypeLimit = false,
+  completeTeamDays = false,
   rosterStartDate,
   trades: recordedTrades,
   limit = 12,
@@ -333,5 +378,6 @@ export function buildLeagueActivity({
     }),
     limit,
     perTypeLimit,
+    completeTeamDays,
   );
 }
