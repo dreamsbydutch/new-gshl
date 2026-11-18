@@ -174,6 +174,28 @@
   .gshl-section-title {
     @apply text-sm font-bold leading-5 text-slate-950;
   }
+  .gshl-home-cards .gshl-section h2 {
+    @apply text-lg font-bold leading-7 text-slate-950 sm:text-xl;
+  }
+  .gshl-masonry {
+    @apply grid min-w-0 grid-cols-1 items-start gap-2 md:grid-cols-2;
+  }
+  .gshl-masonry[data-masonry="ready"] {
+    grid-auto-flow: row dense;
+    grid-auto-rows: 1px;
+    row-gap: 0;
+  }
+  .gshl-masonry-item {
+    min-width: 0;
+  }
+  .gshl-masonry-content {
+    display: flow-root;
+    min-width: 0;
+  }
+  /* Notices that render null must not reserve an empty grid position. */
+  .gshl-masonry-item:has(> .gshl-masonry-content:empty) {
+    display: none;
+  }
   .gshl-text-action {
     @apply inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-semibold text-slate-700 underline-offset-4 hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500;
   }

@@ -1,4 +1,5 @@
 import { Skeleton } from "../ui/SkeletonPrimitive";
+import { MasonryGrid } from "../ui/MasonryGrid";
 
 export function LeagueActivityRowsSkeleton() {
   return (
@@ -133,17 +134,14 @@ export function HomeSkeleton() {
             ))}
           </div>
         </section>
-        <div className="grid min-w-0 items-start gap-2 md:grid-cols-2">
-          <div className="min-w-0 space-y-2">
-            <section
-              className="gshl-section space-y-2"
-              aria-label="Loading league news"
-            >
-              <Skeleton className="h-8 w-28" />
-              <Skeleton className="h-14 w-full" />
-            </section>
-            <LeagueActivityCardSkeleton />
-          </div>
+        <MasonryGrid>
+          <section
+            className="gshl-section space-y-2"
+            aria-label="Loading league news"
+          >
+            <Skeleton className="h-8 w-28" />
+            <Skeleton className="h-14 w-full" />
+          </section>
           <section
             className="gshl-section space-y-1"
             aria-label="Loading standings"
@@ -153,12 +151,9 @@ export function HomeSkeleton() {
               <Skeleton key={index} className="mx-auto h-11 w-full max-w-sm" />
             ))}
           </section>
-          <div className="min-w-0">
-            <PowerRankingsHomeCardSkeleton />
-          </div>
-          <div className="min-w-0">
-            <NHLScheduleHomeCardSkeleton />
-          </div>
+          <LeagueActivityCardSkeleton />
+          <PowerRankingsHomeCardSkeleton />
+          <NHLScheduleHomeCardSkeleton />
           <section
             className="gshl-section min-w-0 space-y-1"
             aria-label="Loading Bench of shame"
@@ -168,7 +163,7 @@ export function HomeSkeleton() {
               <Skeleton key={index} className="mx-auto h-10 w-full max-w-sm" />
             ))}
           </section>
-        </div>
+        </MasonryGrid>
       </div>
     </main>
   );
