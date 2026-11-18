@@ -42,14 +42,45 @@ export function NHLStandingsHomeCard({
       {data?.standings.length ? (
         <>
           <p className="py-1 text-center text-[10px] text-slate-500">
+            {!data.isPreseason && (
+              <span className="mr-2">
+                <span
+                  aria-hidden="true"
+                  className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-100"
+                />
+                Playoff position
+              </span>
+            )}
             {data.isPreseason ? "Preseason · " : ""}PTS
           </p>
-          <div className="mx-auto grid max-w-md grid-cols-4 divide-x divide-slate-100">
-            {divisions.map(({ name, teams }) => (
+          <div className="mx-auto grid max-w-md grid-cols-[1fr_1fr_1.5rem_1fr_1fr] sm:grid-cols-[1fr_1fr_2rem_1fr_1fr]">
+            <div className="col-span-2 border-b text-center text-[10px] font-semibold">
+              Eastern
+            </div>
+            <div className="col-span-2 col-start-4 border-b text-center text-[10px] font-semibold">
+              Western
+            </div>
+            <div aria-hidden="true" className="col-start-3 row-start-2">
+              <div className="invisible border-b py-1 text-[10px]">Rank</div>
+              {["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"].map(
+                (rank) => (
+                  <div
+                    key={rank}
+                    className="flex h-8 items-center justify-center text-[10px] font-semibold text-slate-600 sm:h-10"
+                  >
+                    <span className="rounded bg-slate-100 px-0.5">
+                      {data.isPreseason ? "-" : rank}
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
+            {divisions.map(({ name, teams }, i) => (
               <section
                 key={name}
                 aria-label={`${name} division`}
-                className="min-w-0"
+                className="row-start-2 min-w-0"
+                style={{ gridColumn: i < 2 ? i + 1 : i + 2 }}
               >
                 <h3
                   className="truncate border-b border-slate-100 py-1 text-center text-[10px] font-semibold text-slate-600"
@@ -58,37 +89,47 @@ export function NHLStandingsHomeCard({
                   {name}
                 </h3>
                 <ol className="divide-y divide-slate-100">
-                  {teams.map((team) => (
-                    <li
-                      key={team.teamAbbrev.default}
-                      title={`${team.teamName.default}: ${team.points} points`}
-                      className="grid min-h-8 grid-cols-[0.5rem_1.5rem_1.25rem] items-center justify-center gap-1 text-[10px] tabular-nums sm:min-h-10 sm:grid-cols-[0.5rem_2rem_1.25rem]"
-                    >
-                      <span className="sr-only">
-                        {team.teamName.default},{" "}
-                        {data.isPreseason
-                          ? "preseason"
-                          : `division place ${team.divisionSequence}`}
-                        , {team.points} points
-                      </span>
-                      <span aria-hidden="true" className="text-slate-400">
-                        {data.isPreseason ? "–" : team.divisionSequence}
-                      </span>
-                      <span aria-hidden="true">
-                        <NHLLogo
-                          team={{ name: team.teamAbbrev.default, logoUrl: "" }}
-                          size={32}
-                          className="!mx-0 !h-6 !w-6 sm:!h-8 sm:!w-8"
-                        />
-                      </span>
-                      <span
-                        aria-hidden="true"
-                        className="text-right font-semibold text-slate-800"
+                  {teams.map((team) => {
+                    const qualifies =
+                      !data.isPreseason &&
+                      ((team.divisionSequence > 0 &&
+                        team.divisionSequence <= 3) ||
+                        (team.wildcardSequence != null &&
+                          team.wildcardSequence > 0 &&
+                          team.wildcardSequence <= 2));
+                    return (
+                      <li
+                        key={team.teamAbbrev.default}
+                        title={`${team.teamName.default}: ${team.points} points${qualifies ? ", in playoff position" : ""}`}
+                        className={`grid h-8 grid-cols-[1.5rem_1.25rem] items-center justify-center gap-1 text-[10px] tabular-nums sm:h-10 sm:grid-cols-[2rem_1.25rem] ${qualifies ? "bg-emerald-50" : ""}`}
                       >
-                        {team.points}
-                      </span>
-                    </li>
-                  ))}
+                        <span className="sr-only">
+                          {team.teamName.default},{" "}
+                          {data.isPreseason
+                            ? "preseason"
+                            : `division place ${team.divisionSequence}`}
+                          , {team.points} points
+                          {qualifies && ", in playoff position"}
+                        </span>
+                        <span aria-hidden="true">
+                          <NHLLogo
+                            team={{
+                              name: team.teamAbbrev.default,
+                              logoUrl: "",
+                            }}
+                            size={32}
+                            className="!mx-0 !h-6 !w-6 sm:!h-8 sm:!w-8"
+                          />
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className="text-right font-semibold text-slate-800"
+                        >
+                          {team.points}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ol>
                 {!teams.length && (
                   <p className="py-2 text-center text-[10px] text-slate-500">

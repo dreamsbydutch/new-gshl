@@ -93,6 +93,7 @@ export const nhlStandingsSchema = z.object({
       conferenceName: z.string(),
       divisionName: z.string(),
       divisionSequence: z.number(),
+      wildcardSequence: z.number().optional(),
       gamesPlayed: z.number(),
       wins: z.number(),
       losses: z.number(),
