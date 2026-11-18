@@ -39,7 +39,9 @@ export function getNHLHomeScheduleDays(now: Date, rolloverHour = 0) {
   // Shift the calendar date, not the instant: DST can skip or repeat hours.
   const dayOffset = easternHour < rolloverHour ? -1 : 0;
   return (["Yesterday", "Today", "Tomorrow"] as const).map((label, index) => {
-    const day = new Date(Date.parse(today) + (index - 1 + dayOffset) * 86400000);
+    const day = new Date(
+      Date.parse(today) + (index - 1 + dayOffset) * 86400000,
+    );
     const year = day.getUTCFullYear();
     const endingYear = year + (day.getUTCMonth() >= 6 ? 1 : 0);
     return {
@@ -102,6 +104,22 @@ export const nhlStandingsSchema = z.object({
     }),
   ),
 });
+
+export function buildNHLDivisionStandings(
+  standings: readonly z.infer<typeof nhlStandingsSchema>["standings"][number][],
+) {
+  return NHL_DIVISION_ORDER.map((name) => ({
+    name,
+    teams: standings
+      .filter((team) => team.divisionName === name)
+      .sort(
+        (a, b) =>
+          a.divisionSequence - b.divisionSequence ||
+          a.teamAbbrev.default.localeCompare(b.teamAbbrev.default),
+      )
+      .slice(0, 8),
+  }));
+}
 
 const gameTeam = z.object({
   abbrev: z.string(),

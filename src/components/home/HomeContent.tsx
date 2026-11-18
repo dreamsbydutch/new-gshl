@@ -10,6 +10,7 @@ import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionH
 import { SectionHeading } from "@gshl-components/ui/SectionHeading";
 import { MasonryGrid } from "@gshl-components/ui/MasonryGrid";
 import { NHLScheduleHomeCard } from "./NHLScheduleHomeCard";
+import { NHLStandingsHomeCard } from "./NHLStandingsHomeCard";
 import { DraftHubCard } from "./DraftHubCard";
 import { HomeScoreboard } from "./HomeScoreboard";
 import { StandingsPreview } from "./StandingsPreview";
@@ -201,6 +202,12 @@ export function HomeContent() {
           <PowerRankingsHomeCard seasonId={view.season.id} />
         ) : null}
         <NHLScheduleHomeCard />
+        {view.season ? (
+          <NHLStandingsHomeCard
+            seasonId={view.season.id}
+            seasonYear={view.season.year}
+          />
+        ) : null}
         {view.season ? <LineupShameCard seasonId={view.season.id} /> : null}
       </MasonryGrid>
     </main>

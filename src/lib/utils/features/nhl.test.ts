@@ -10,12 +10,53 @@ import {
   getNHLHomeScheduleDays,
   countGshlPlayersByNhlTeam,
   isNHLGameFinal,
+  buildNHLDivisionStandings,
+  NHL_DIVISION_ORDER,
 } from "./nhl";
 import {
   buildScheduleNavigationHref,
   isScheduleNavigationView,
   isStandingsNavigationView,
 } from "./contextual-navigation";
+
+void test("Home NHL divisions retain official order and points without mutating the source", () => {
+  const rows = NHL_DIVISION_ORDER.flatMap((divisionName, d) =>
+    Array.from({ length: 8 }, (_, i) => ({
+      divisionName,
+      divisionSequence: 8 - i,
+      teamName: { default: `Team ${d}-${i}` },
+      teamAbbrev: { default: `${d}-${i}` },
+      conferenceName: "Test",
+      gamesPlayed: 20,
+      wins: 10,
+      losses: 8,
+      otLosses: 2,
+      points: i === 0 ? 0 : 100 + i,
+      goalDifferential: 0,
+      date: "2026-11-18",
+      seasonId: 20262027,
+    })),
+  ).reverse();
+  const before = structuredClone(rows);
+  const divisions = buildNHLDivisionStandings(rows);
+  assert.deepEqual(
+    divisions.map((d) => d.name),
+    NHL_DIVISION_ORDER,
+  );
+  for (const division of divisions) {
+    assert.deepEqual(
+      division.teams.map((t) => t.divisionSequence),
+      [1, 2, 3, 4, 5, 6, 7, 8],
+    );
+    assert.equal(division.teams[7]?.points, 0);
+    assert.equal(division.teams[0]?.points, 107);
+  }
+  assert.deepEqual(rows, before);
+  assert.deepEqual(
+    buildNHLDivisionStandings([]).map((d) => d.teams.length),
+    [0, 0, 0, 0],
+  );
+});
 
 void test("Three Stars are available only for final NHL game states", () => {
   for (const state of ["FINAL", "OFF"])

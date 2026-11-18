@@ -115,6 +115,28 @@ export function NHLScheduleHomeCardSkeleton() {
   );
 }
 
+export function NHLStandingsHomeCardSkeleton() {
+  return (
+    <section
+      className="gshl-section"
+      role="status"
+      aria-label="Loading NHL standings"
+    >
+      <Skeleton className="mb-2 h-8 w-28" />
+      <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+        {Array.from({ length: 4 }, (_, column) => (
+          <div key={column} className="space-y-1">
+            <Skeleton className="h-5 w-full" />
+            {Array.from({ length: 8 }, (_, row) => (
+              <Skeleton key={row} className="mx-auto h-7 w-12" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function HomeSkeleton() {
   return (
     <main
@@ -154,6 +176,7 @@ export function HomeSkeleton() {
           <LeagueActivityCardSkeleton />
           <PowerRankingsHomeCardSkeleton />
           <NHLScheduleHomeCardSkeleton />
+          <NHLStandingsHomeCardSkeleton />
           <section
             className="gshl-section min-w-0 space-y-1"
             aria-label="Loading Bench of shame"
