@@ -128,7 +128,7 @@ export function NHLStandingsHomeCardSkeleton() {
           <div key={column} className="space-y-1">
             <Skeleton className="h-5 w-full" />
             {Array.from({ length: 8 }, (_, row) => (
-              <Skeleton key={row} className="mx-auto h-7 w-12" />
+              <Skeleton key={row} className="mx-auto h-7 w-14 sm:h-9 sm:w-16" />
             ))}
           </div>
         ))}

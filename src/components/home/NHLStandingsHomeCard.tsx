@@ -62,7 +62,7 @@ export function NHLStandingsHomeCard({
                     <li
                       key={team.teamAbbrev.default}
                       title={`${team.teamName.default}: ${team.points} points`}
-                      className="grid min-h-8 grid-cols-[0.5rem_1.25rem_1.25rem] items-center justify-center gap-1 text-[10px] tabular-nums"
+                      className="grid min-h-8 grid-cols-[0.5rem_1.5rem_1.25rem] items-center justify-center gap-1 text-[10px] tabular-nums sm:min-h-10 sm:grid-cols-[0.5rem_2rem_1.25rem]"
                     >
                       <span className="sr-only">
                         {team.teamName.default},{" "}
@@ -77,8 +77,8 @@ export function NHLStandingsHomeCard({
                       <span aria-hidden="true">
                         <NHLLogo
                           team={{ name: team.teamAbbrev.default, logoUrl: "" }}
-                          size={20}
-                          className="!mx-0"
+                          size={32}
+                          className="!mx-0 !h-6 !w-6 sm:!h-8 sm:!w-8"
                         />
                       </span>
                       <span
