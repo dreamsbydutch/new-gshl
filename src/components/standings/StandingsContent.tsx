@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import {
   useNav,
   usePlayerAwards,
-  usePlayers,
+  usePlayersByIds,
   usePlayerStats,
   useStandingsData,
   useTeamAwards,
@@ -86,9 +86,6 @@ function GSHLStandingsContent() {
       orderBy: { award: "asc" },
     },
   );
-  const { data: players = [], isLoading: playersLoading } = usePlayers({
-    enabled: isAwardsView,
-  });
   const playerTotalsQuery = usePlayerStats({
     seasonId: selectedSeasonId ?? undefined,
     enabled: isAwardsView && Boolean(selectedSeasonId),
@@ -97,6 +94,14 @@ function GSHLStandingsContent() {
     includeSplits: false,
     includeTotals: true,
   });
+
+  const { data: players = [], isLoading: playersLoading } = usePlayersByIds(
+    [
+      ...playerAwards.map((award) => String(award.playerId)),
+      ...playerTotalsQuery.totals.map((row) => String(row.playerId)),
+    ],
+    isAwardsView && !playerAwardsLoading && !playerTotalsQuery.status.isLoading,
+  );
 
   if (
     isLoading ||

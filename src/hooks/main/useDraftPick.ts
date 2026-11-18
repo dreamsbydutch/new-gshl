@@ -1,6 +1,8 @@
 "use client";
 
-import { usePaginatedQuery, useQuery } from "convex/react";
+import { useMemo } from "react";
+import { useQueries, usePaginatedQuery, useQuery } from "convex/react";
+import type { RequestForQueries } from "convex/react";
 import type { FunctionArgs } from "convex/server";
 import { useDomainMutation } from "./useDomainMutation";
 import { api } from "../../../convex/_generated/api";
@@ -42,6 +44,32 @@ export function useDraftPicks(options: UseDraftPicksOptions = {}) {
   return {
     data: (result ?? []) as unknown as DraftPick[],
     isLoading: enabled && result === undefined,
+  };
+}
+
+export function useDraftPicksByTeams(teamIds: string[], enabled = true) {
+  const teamKey = JSON.stringify([...new Set(teamIds)].sort());
+  const queries = useMemo<RequestForQueries>(
+    () =>
+      Object.fromEntries(
+        (enabled ? (JSON.parse(teamKey) as string[]) : []).map((teamId) => [
+          teamId,
+          {
+            query: api.frontend.draftPicks,
+            args: { where: { teamId } },
+          },
+        ]),
+      ),
+    [enabled, teamKey],
+  );
+  const results = Object.values(useQueries(queries));
+  const error = results.find((value): value is Error => value instanceof Error);
+  if (error) throw error;
+  return {
+    data: results.flatMap((value) =>
+      Array.isArray(value) ? (value as DraftPick[]) : [],
+    ),
+    isLoading: results.some((value) => value === undefined),
   };
 }
 

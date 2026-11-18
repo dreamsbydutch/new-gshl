@@ -245,3 +245,75 @@ void test("draft query adapters expose loading and data without invented errors"
     assert.equal(hook.subscriptions.size, 0);
   }
 });
+import { useUfaCatalog } from "../src/hooks/main/useUfa";
+import { useDraftPicksByTeams } from "../src/hooks/main/useDraftPick";
+import { useLeagueActivity } from "../src/hooks/main/useLeagueActivity";
+
+void test("week-only bundle never requests every historical team", (t) => {
+  const h = mount(t, () =>
+    useSeasonDataBundle({
+      seasonId: null,
+      weekId: "week",
+      useNavigation: false,
+    }),
+  );
+  assert.equal(h.subscriptions.has("frontend:teams"), false);
+  assert.equal(h.subscriptions.has("frontend:matchups"), true);
+});
+
+void test("ineligible owner panel does not subscribe to UFA catalogs or offers", (t) => {
+  const h = mount(t, () => useUfaCatalog("home", false));
+  assert.equal(h.subscriptions.size, 0);
+  assert.equal(h.current.isLoading, false);
+});
+
+void test("team draft picks never fall back to an unscoped read", (t) => {
+  let ids: string[] = [];
+  const h = mount(t, () => useDraftPicksByTeams(ids));
+  assert.equal(h.subscriptions.size, 0);
+  ids = ["team", "team"];
+  h.rerender();
+  assert.equal(h.caught, undefined);
+  const args: unknown = h.transport.mock.calls.at(-1)?.arguments[1];
+  assert.deepEqual(args, { where: { teamId: "team" } });
+  h.publish("frontend:draftPicks", [{ id: "pick" }]);
+  assert.equal(h.current.data.length, 1);
+});
+
+void test("activity preview requests six per type and expands only on demand", (t) => {
+  let take = 6;
+  const h = mount(t, () => useLeagueActivity("season", take));
+  assert.deepEqual(h.transport.mock.calls.at(-1)?.arguments[1], {
+    seasonId: "season",
+    take: 6,
+    grouped: true,
+  });
+  take = 12;
+  h.rerender();
+  assert.deepEqual(h.transport.mock.calls.at(-1)?.arguments[1], {
+    seasonId: "season",
+    take: 12,
+    grouped: true,
+  });
+});
+
+void test("activity expansion keeps its preview mounted and never carries it into another season", (t) => {
+  let take = 6;
+  let seasonId = "first";
+  const h = mount(t, () => useLeagueActivity(seasonId, take));
+  const preview = [{ id: "event", type: "add" }];
+  h.publish("frontend:activity", preview);
+  take = 12;
+  h.rerender();
+  h.publish("frontend:activity", undefined);
+  assert.equal(h.current.data, preview);
+  assert.equal(
+    h.current.isLoading,
+    false,
+    "keep controls mounted during expansion",
+  );
+  seasonId = "second";
+  h.rerender();
+  assert.deepEqual(h.current.data, []);
+  assert.equal(h.current.isLoading, true);
+});

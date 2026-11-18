@@ -11,6 +11,7 @@ import {
 } from "../../integrations/data/convex-store";
 import { fetchDailyGameStatus } from "../../integrations/nhl/daily-game-status";
 import { shiftYahooDate } from "../../domains/yahoo/sync-cycle";
+import { refreshDailySeasonAggregates } from "../../domains/aggregation/daily-season-aggregation";
 import { refreshOpenWeekStats } from "../../domains/nhl/refresh-open-week-stats";
 import type { DatabaseRecord } from "../../integrations/data/records";
 import {
@@ -46,7 +47,7 @@ async function main() {
   });
   if (values.help) {
     console.log(
-      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD --locked-roster-dates DATE,DATE [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings, then refreshes provisionally from 03:00 Toronto; at/after noon it freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
+      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD --locked-roster-dates DATE,DATE [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings (season/career aggregates at final handoff), then refreshes provisionally from 03:00 Toronto; at/after noon it freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
     );
     return;
   }
@@ -213,6 +214,20 @@ async function main() {
   );
   await runWeeklyRollover(
     {
+      aggregates: async () => {
+        console.log(
+          JSON.stringify(
+            await refreshDailySeasonAggregates(
+              season as DatabaseRecord & { id: string },
+              !!values.apply,
+              undefined,
+              { mode: "overnight", publishSeasonOnly: true },
+            ),
+            null,
+            2,
+          ),
+        );
+      },
       standings: async () => {
         run("standings/backfill-season-standings.ts");
       },
@@ -235,6 +250,7 @@ async function main() {
       },
     },
     !!values.apply,
+    provisional,
   );
 }
 

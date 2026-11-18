@@ -15,6 +15,7 @@ import {
   finishCompatibilityRead,
 } from "./lib/compatibilityRead";
 import { rebuildTeamLineup as rebuildLineup } from "./lib/teamLineup";
+import { pickDefinedFields } from "./lib/publicProjection";
 import { syncPlayerDayPerformanceIndex } from "./lib/playerDayPerformanceIndex";
 
 type Row = Record<string, unknown>;
@@ -1000,7 +1001,7 @@ async function applyAwardsUpsertByCompositeKey(
 }
 
 export const list = queryGeneric({
-  args: queryArgs,
+  args: { ...queryArgs, fields: v.optional(v.array(v.string())) },
   handler: async (ctx, args) => {
     requireServerSecret(args.serverSecret);
     const where = normalizeWhere(args.table, args.where);
@@ -1020,7 +1021,10 @@ export const list = queryGeneric({
       return finishCompatibilityRead(args.table, normalized, normalizedArgs);
     }
     return (await readCompatibilityRows(ctx, args.table, normalizedArgs)).map(
-      publicRow,
+      (row) =>
+        args.fields
+          ? pickDefinedFields(publicRow(row), ["id", ...args.fields])
+          : publicRow(row),
     );
   },
 });

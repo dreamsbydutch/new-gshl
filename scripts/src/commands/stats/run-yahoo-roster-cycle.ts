@@ -34,12 +34,12 @@ official regular-season/playoff game is LIVE/CRIT (including after midnight).
 Yahoo runs hourly between 08:00 and 22:00 Toronto. One final capture after
 all games start locks that date; later NHL updates use stored rosters.
 NHL-only updates continue through 03:00, using the previous date after midnight.
-Between midnight and 08:00, yesterday's full season/career/NHL refresh runs once
+Between midnight and 08:00, yesterday's day/week and NHL refresh runs once
 all its games are final. Unknown or unfinished schedules defer this stage.
 Morning runs recheck the previous two days.
 Hourly NHL runs recheck all prior days of unfinalized matchups for corrections.
 Finalized weeks are frozen; their roster and NHL records are not refreshed.
-After final stats, ended weeks refresh standings/power and release the Press Box.
+After final stats, ended weeks refresh season/career aggregates, standings/power and release the Press Box.
 Offline gaps catch up two historical dates per cycle. Failed stages retry.
 Credentials stay in memory: CONVEX_SERVER_SECRET or the signed-in Convex CLI.
 `;
@@ -434,7 +434,7 @@ async function main() {
         run(plan.nightlyDate < endDate ? plan.nightlyDate : endDate, [
           "--nhl-only",
           "--aggregate-mode",
-          "overnight",
+          "frequent",
         ]);
         const nightly = spawnSync(
           process.execPath,

@@ -25,7 +25,8 @@ export function useDraftHubTeamData(
   });
   const draftPicksQuery = useDraftPicks({
     seasonId: season?.id,
-    enabled: Boolean(season?.id),
+    teamId: selectedTeam?.id,
+    enabled: Boolean(season?.id && selectedTeam?.id),
   });
   const nhlTeamsQuery = useNHLTeams({
     enabled: Boolean(selectedTeam?.id),

@@ -88,12 +88,18 @@ export async function refreshDailySeasonAggregates(
   season: DatabaseRecord & { id: string },
   apply: boolean,
   previewRoster?: { date: string; days: RosterMetadata[] },
-  options: { mode?: DailyAggregationMode; weekIds?: readonly string[] } = {},
+  options: {
+    mode?: DailyAggregationMode;
+    weekIds?: readonly string[];
+    publishSeasonOnly?: boolean;
+  } = {},
   dependencies: DailyAggregationDependencies = defaults,
 ) {
   const mode = options.mode ?? "frequent";
   if (mode !== "frequent" && mode !== "overnight")
     throw Error("Unknown daily aggregation mode");
+  if (options.publishSeasonOnly && mode !== "overnight")
+    throw Error("Season-only publication requires the full season calculation");
   if (mode === "overnight" && options.weekIds !== undefined)
     throw Error(
       "Overnight totals require the complete season, not a week scope",
@@ -269,6 +275,7 @@ export async function refreshDailySeasonAggregates(
     storedDays.map((r) => [String(r._id ?? r.id ?? ""), r]),
   );
   const dayWrites = generated.playerDays.filter((row) => {
+    if (options.publishSeasonOnly) return false;
     const previous = previousById.get(String(row._id ?? row.id ?? ""));
     return (
       !previous ||
@@ -307,6 +314,13 @@ export async function refreshDailySeasonAggregates(
     ratingOnly: true,
   });
   for (const [modelName, rows] of inputs) {
+    if (
+      options.publishSeasonOnly &&
+      ["PlayerWeekStatLine", "TeamDayStatLine", "TeamWeekStatLine"].includes(
+        modelName,
+      )
+    )
+      continue;
     const stats = rows.map(writableStats);
     summaries.push(
       apply

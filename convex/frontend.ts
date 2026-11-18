@@ -806,6 +806,7 @@ export const powerRankingsPreview = query({
 export const playersPage = query({
   args: {
     active: v.optional(v.boolean()),
+    positionGroup: v.optional(v.string()),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
@@ -819,7 +820,10 @@ export const playersPage = query({
               q.eq("isActive", args.active!),
             )
             .order("desc");
-    const page = await query.paginate(args.paginationOpts);
+    const scoped = args.positionGroup
+      ? query.filter((q) => q.eq(q.field("posGroup"), args.positionGroup))
+      : query;
+    const page = await scoped.paginate(args.paginationOpts);
     return { ...page, page: page.page.map((row) => publicRow(row as Row)) };
   },
 });

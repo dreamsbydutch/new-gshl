@@ -319,12 +319,13 @@ function compactRecord(
 
 export async function fetchModel<T extends AnyRow>(
   model: ModelName,
-  options: { includeNhlOnly?: boolean } = {},
+  options: { includeNhlOnly?: boolean; fields?: string[] } = {},
 ): Promise<T[]> {
   const rows = await getClient().query(
     refs.list,
     serverArgs({
       table: getConvexTableName(model),
+      ...(options.fields ? { fields: options.fields } : {}),
     }),
   );
   const hydrated = rows.map(hydrateRow<T>);

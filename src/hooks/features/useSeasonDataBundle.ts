@@ -61,7 +61,7 @@ export function useSeasonDataBundle(
 
   const teamsQuery = useTeams({
     seasonId,
-    enabled: hasSeasonScope || hasWeekScope,
+    enabled: hasSeasonScope,
   });
 
   const weeksQuery = useWeeks({

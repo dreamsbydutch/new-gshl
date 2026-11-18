@@ -62,12 +62,16 @@ export function allScoringGamesFinished(
 /** A failure prevents publication; an unmarked week retries on the next cycle. */
 export async function runWeeklyRollover(
   stages: {
+    aggregates: () => Promise<void>;
     standings: () => Promise<void>;
     power: () => Promise<void>;
     publish: () => Promise<void>;
   },
   apply: boolean,
+  provisional = false,
 ) {
+  // Hourly provisional corrections retain the last published season totals.
+  if (!provisional) await stages.aggregates();
   await stages.standings();
   await stages.power();
   // Rank tiebreaks and matchup rank snapshots use the newly persisted power.

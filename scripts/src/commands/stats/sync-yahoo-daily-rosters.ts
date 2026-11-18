@@ -165,13 +165,11 @@ async function main() {
       `Expected one GSHL season for ${date}; found ${selected.length}. Supply --season-id to use its existing week calendar.`,
     );
   const season = selected[0]!;
-  const [teams, weeks, players, existing] = await Promise.all([
+  const [teams, weeks] = await Promise.all([
     fetchSeasonModel<
       Record<string, unknown> & { id: string; yahooId?: string }
     >("Team", season.id),
     fetchSeasonModel<CalendarRow>("Week", season.id),
-    fetchModel<Record<string, unknown> & RosterIdentity>("Player"),
-    fetchPlayerDayDate<Record<string, unknown> & RosterDay>(season.id, date),
   ]);
   const selectedWeeks = weeks.filter((week) => coversDate(week));
   const lastScoringDate = weeks
@@ -237,6 +235,9 @@ async function main() {
     );
     return;
   }
+  const existing = await fetchPlayerDayDate<
+    Record<string, unknown> & RosterDay
+  >(season.id, date);
   const syncNhl = async () => {
     const { parseDailyNhlPlayerStatSyncOptions, runDailyNhlPlayerStatSync } =
       await import("../../domains/nhl/daily-player-stats-sync");
@@ -322,6 +323,10 @@ async function main() {
       teams: teams.length,
       apply: !!values.apply,
     }),
+  );
+  const players = await fetchModel<Record<string, unknown> & RosterIdentity>(
+    "Player",
+    { fields: ["fullName", "yahooId"] },
   );
   // Partial postseason captures cannot authorize league-wide ownership changes.
   const rawRosters = [];
