@@ -187,26 +187,9 @@ export interface FranchiseDraftPickGroupType {
   picks: FranchiseDraftPickRowType[];
 }
 
-export interface FranchiseDraftPickSummaryProps {
-  groups: FranchiseDraftPickGroupType[];
-  hasData: boolean;
-}
-
 export interface FranchiseContractHistoryProps {
   rows: FranchiseContractHistoryRowType[];
   hasData: boolean;
-}
-
-export interface TeamBuyoutTableProps {
-  buyoutContracts: BuyoutContractType[];
-  currentTeam: GSHLTeam;
-  players: Player[];
-  nhlTeams: NHLTeam[];
-  ready: boolean;
-}
-
-export interface PlayerContractRowSkeletonProps {
-  contract: Contract;
 }
 
 export interface ContractTableProps {

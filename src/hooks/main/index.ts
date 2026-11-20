@@ -60,11 +60,9 @@ export {
   useSubmitDraftPick,
   useUndoDraftPick,
 } from "./useDraftHub";
-export { useAwards } from "./useAward";
 export { usePlayerAwards } from "./usePlayerAward";
 export { useTeamAwards } from "./useTeamAward";
 export type {
-  UseAwardsOptions,
   UseDraftHubStatusOptions,
   UseDraftPicksOptions,
   UsePlayerAwardsOptions,
@@ -94,13 +92,11 @@ export {
   usePlayerPages,
   usePlayersByIds,
   useActivePlayers,
-  useRankedPlayers,
   useRosterPlayers,
 } from "./usePlayer";
 export type {
   PlayerRankField,
   UsePlayersOptions,
-  UseRankedPlayersOptions,
   UseRosterPlayersOptions,
 } from "@gshl-types";
 export {
@@ -108,7 +104,6 @@ export {
   useCareerSplits,
   usePlayerSplitsByTeams,
   usePlayerTotalsByPlayers,
-  usePlayerNhlStatsByPlayers,
   useLatestPlayerNhlStats,
 } from "./usePlayerStats";
 export type { UsePlayerStatsOptions, UsePlayerStatsResult } from "@gshl-types";
@@ -138,23 +133,14 @@ export type {
 
 // Week and scheduling hooks
 export { useWeeks } from "./useWeek";
-export {
-  useTeamScheduleStats,
-  useTeamScheduleSummary,
-} from "./useTeamSchedule";
+export { useTeamScheduleSummary } from "./useTeamSchedule";
 export { useWeeklyScheduleSummary } from "./useWeeklySchedule";
 export type { UseWeeksOptions, WeekTimeMode } from "@gshl-types";
 
 // Navigation selection hooks
-export {
-  useNav,
-  useNavigationHydration,
-  useNavigationReset,
-  useSelectedSeasonId,
-} from "./useNav";
+export { useNav, useNavigationHydration } from "./useNav";
 export {
   useAppPathname,
   useAppRouter,
   useAppSearchParams,
 } from "./useNextNavigation";
-export { useDesktopViewport } from "./useDesktopViewport";

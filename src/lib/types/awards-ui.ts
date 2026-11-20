@@ -82,13 +82,6 @@ export interface AwardRaceCard {
   }[];
 }
 
-export interface AwardsShowcaseProps {
-  playerAwards: PlayerAward[];
-  teamAwards: TeamAward[];
-  players: Player[];
-  teams: GSHLTeam[];
-}
-
 export type BuildTrophyCaseDataInput = TrophyCaseProps;
 
 export interface BuildTrophyCaseDataResult {

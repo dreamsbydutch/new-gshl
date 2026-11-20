@@ -34,10 +34,8 @@ import {
   getSeasonDisplay,
   groupContractsByPlayer,
   isPlayingContract,
-  showDate,
 } from "@gshl-utils";
 import type {
-  TeamBuyoutTableProps,
   ContractTableProps,
   CapSpaceRowProps,
   PlayerContractRowProps,
@@ -496,141 +494,6 @@ export function TeamContractTable({
           </tbody>
         </table>
       </TableViewport>
-    </section>
-  );
-}
-
-export function TeamBuyoutTable({
-  buyoutContracts,
-  currentTeam,
-  players,
-  nhlTeams,
-  ready,
-}: TeamBuyoutTableProps) {
-  const playerById = useMemo(() => {
-    const map = new Map<string, Player>();
-    players.forEach((player) => {
-      if (player?.id) {
-        map.set(player.id, player);
-      }
-    });
-    return map;
-  }, [players]);
-
-  if (!ready) return null;
-
-  return (
-    <section
-      aria-labelledby="buyout-contracts-heading"
-      className="mx-auto mb-8 w-full max-w-4xl"
-    >
-      <h2
-        id="buyout-contracts-heading"
-        className="mt-4 w-full text-center text-lg font-bold"
-      >
-        Buyouts
-      </h2>
-      {buyoutContracts.length === 0 ? (
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          No buyouts for {currentTeam.name}.
-        </p>
-      ) : (
-        <TableViewport
-          ariaLabel={`Buyout contracts for ${currentTeam.name}`}
-          className="mt-2"
-          scrollHint="Scroll for complete buyout details"
-        >
-          <table className="mx-auto min-w-max whitespace-nowrap text-xs">
-            <caption className="sr-only">
-              Buyout contracts for {currentTeam.name}
-            </caption>
-            <thead>
-              <tr className="bg-gray-800 text-gray-200">
-                <th
-                  scope="col"
-                  className="bg-gray-800 px-2 py-1 text-center font-normal lg:sticky lg:left-0 lg:z-30"
-                >
-                  Player
-                </th>
-                <th scope="col" className="px-2 py-1 text-center font-normal">
-                  Pos
-                </th>
-                <th scope="col" className="px-2 py-1 text-center font-normal">
-                  Team
-                </th>
-                <th scope="col" className="px-2 py-1 text-center font-normal">
-                  Cap Hit
-                </th>
-                <th scope="col" className="px-2 py-1 text-center font-normal">
-                  Expiry
-                </th>
-                <th scope="col" className="px-2 py-1 text-center font-normal">
-                  Buyout End
-                </th>
-                <th scope="col" className="px-2 py-1 text-center font-normal">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {buyoutContracts.map((contract, index) => {
-                const player = playerById.get(contract.playerId);
-                const playerNhlAbbr = player
-                  ? getPlayerNhlAbbreviation(player)
-                  : null;
-                const playerNhlTeam = findNhlTeamByAbbreviation(
-                  nhlTeams,
-                  playerNhlAbbr,
-                );
-
-                return (
-                  <tr
-                    key={contract.id || `buyout-row-${index}`}
-                    className={
-                      contract.isActiveBuyout
-                        ? "text-gray-900"
-                        : "text-gray-400"
-                    }
-                  >
-                    <th
-                      scope="row"
-                      className="bg-white px-2 py-1 text-center font-normal lg:sticky lg:left-0 lg:z-20"
-                    >
-                      {player?.fullName ?? "Unknown"}
-                    </th>
-                    <td className="px-2 py-1 text-center">
-                      {player?.nhlPos?.toString() ?? "-"}
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      <NHLLogo team={playerNhlTeam} size={16} />
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      {formatMoney(contract.capHit)}
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      {showDate(contract.expiryDate)}
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      {showDate(contract.capHitEndDate)}
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      <span
-                        className={
-                          contract.isActiveBuyout
-                            ? "rounded-full bg-orange-100 px-2 py-0.5 text-orange-700"
-                            : "rounded-full bg-gray-100 px-2 py-0.5 text-gray-500"
-                        }
-                      >
-                        {contract.isActiveBuyout ? "Active" : "Expired"}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </TableViewport>
-      )}
     </section>
   );
 }

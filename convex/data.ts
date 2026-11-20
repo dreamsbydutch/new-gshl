@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-base-to-string, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unnecessary-type-assertion */
+import { requireServerSecret } from "./lib/auth";
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -42,13 +43,6 @@ const pageQueryArgs = {
   cursor: v.optional(v.string()),
   limit: v.number(),
 };
-
-function requireServerSecret(serverSecret: string) {
-  const expected = process.env.CONVEX_SERVER_SECRET;
-  if (!expected || serverSecret !== expected) {
-    throw new Error("Unauthorized server request");
-  }
-}
 
 function publicRow(row: Row & { _id: string; _creationTime: number }) {
   return {

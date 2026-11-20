@@ -97,13 +97,6 @@ export type {
   ConferenceConfig,
 } from "@gshl-types";
 
-export {
-  collectInactivePlayerIds,
-  buildPlayerLookup,
-  buildPlayerWeekStatsByTeam,
-  buildTeamWeekStatsByTeam,
-  getUpcomingWeekIds,
-} from "./weekly-schedule";
 export * from "./ufa";
 export * from "./ufa-state";
 export * from "./weekly-edition";
@@ -113,9 +106,9 @@ export type {
   WeekScheduleItemProps,
   TeamDisplayProps,
   ScoreDisplayProps,
-  GameType as WeeklyGameType,
+  WeeklyGameType,
   ConferenceAbbr,
   GameTypeConfig,
-} from "./weekly-schedule";
+} from "@gshl-types";
 
 export * from "./franchise-contracts";

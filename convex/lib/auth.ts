@@ -41,3 +41,11 @@ export async function requireOwnerAccess(
 }
 
 export type { CurrentUser };
+
+/** Authorizes trusted server and operator requests. */
+export function requireServerSecret(serverSecret: string) {
+  const expected = process.env.CONVEX_SERVER_SECRET;
+  if (!expected || serverSecret !== expected) {
+    throw new Error("Unauthorized server request");
+  }
+}

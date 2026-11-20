@@ -91,44 +91,6 @@ export function DraftBoardTableSkeleton() {
   return <DraftPlayerTableSkeleton />;
 }
 
-export function DraftAdminListSkeleton() {
-  return (
-    <div className="mt-8">
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-36" />
-          <Skeleton className="h-4 w-48" />
-        </div>
-        <Skeleton className="h-9 w-36 rounded-md" />
-      </div>
-      <Skeleton className="mb-4 h-4 w-64" />
-      <Skeleton className="mb-4 h-10 w-full rounded-md" />
-      <div className="overflow-x-auto">
-        <div className="min-w-[46rem]">
-          <div className="grid grid-cols-[3rem_12rem_4rem_4rem_7rem_6rem_5rem] gap-3 border-b px-2 py-2">
-            {Array.from({ length: 7 }).map((_, index) => (
-              <Skeleton key={index} className="h-3 w-full" />
-            ))}
-          </div>
-          {Array.from({ length: 10 }).map((_, rowIndex) => (
-            <div
-              key={rowIndex}
-              className="grid grid-cols-[3rem_12rem_4rem_4rem_7rem_6rem_5rem] items-center gap-3 border-b px-2 py-2"
-            >
-              <Skeleton className="h-6 w-6 rounded-sm" />
-              <Skeleton className="h-4 w-32" />
-              {Array.from({ length: 4 }).map((_, cellIndex) => (
-                <Skeleton key={cellIndex} className="h-3 w-10" />
-              ))}
-              <Skeleton className="h-8 w-14 rounded-md" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MockDraftPickSkeleton() {
   return (
     <div className="rounded-md border bg-slate-50 p-2 shadow-sm">

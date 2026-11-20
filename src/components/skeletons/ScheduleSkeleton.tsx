@@ -20,7 +20,7 @@ function ScheduleColumnHeaderSkeleton({
   );
 }
 
-export function TeamScheduleRowSkeleton() {
+function TeamScheduleRowSkeleton() {
   return (
     <div className="grid min-h-10 grid-cols-9 items-center border-b py-2">
       <Skeleton className="h-4 w-8 justify-self-center" />
@@ -44,21 +44,6 @@ export function WeeklyMatchupRowSkeleton() {
       <div className="col-span-4 flex flex-col items-center gap-2 p-2">
         <Skeleton className="h-9 w-9 rounded-md sm:h-12 sm:w-12" />
         <Skeleton className="h-4 w-24 max-w-full" />
-      </div>
-    </div>
-  );
-}
-
-export function MatchupStatsSkeleton() {
-  return (
-    <div className="mx-auto w-5/6 overflow-hidden py-2">
-      <div className="grid min-w-[38rem] grid-cols-[2rem_3rem_repeat(8,1fr)] items-center gap-2">
-        {Array.from({ length: 30 }).map((_, index) => (
-          <Skeleton
-            key={index}
-            className={index % 10 === 0 ? "h-6 w-6 rounded-md" : "h-3 w-full"}
-          />
-        ))}
       </div>
     </div>
   );

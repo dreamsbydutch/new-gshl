@@ -73,7 +73,6 @@ export * from "./uploadthing";
 export * from "./league-office";
 export * from "./league-activity";
 export * from "./jobs";
-export * from "./array-utils";
 export * from "./app-mutation";
 export * from "./auth";
 export * from "./contracts";

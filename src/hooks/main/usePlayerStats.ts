@@ -180,24 +180,6 @@ export function usePlayerTotalsByPlayers(playerIds: string[], enabled = true) {
   };
 }
 
-export function usePlayerNhlStatsByPlayers(
-  playerIds: string[],
-  enabled = true,
-) {
-  const ids = useMemo(() => [...new Set(playerIds)].sort(), [playerIds]);
-  const result = useQuery(
-    api.frontend.playerNhlByPlayers,
-    enabled && ids.length ? { playerIds: ids as Id<"players">[] } : "skip",
-  );
-  return {
-    data:
-      result === undefined
-        ? EMPTY_NHL_STATS
-        : (result as unknown as PlayerNHLStatLine[]),
-    isLoading: enabled && ids.length > 0 && result === undefined,
-  };
-}
-
 export function useLatestPlayerNhlStats(seasonId?: string, enabled = true) {
   const result = useQuery(
     api.frontend.latestPlayerNhlStats,

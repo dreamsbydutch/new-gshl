@@ -20,7 +20,6 @@ export * from "./HomeSkeleton";
 export * from "./LeagueOfficeSkeleton";
 export * from "./LockerRoomSkeleton";
 export * from "./MatchupSkeleton";
-export * from "./PlayerContractRowSkeleton";
 export * from "./ScheduleSkeleton";
 export * from "./StandingsSkeleton";
 export * from "./TeamContractTableSkeleton";

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 import { mutation, query } from "./_generated/server";
+import { requireServerSecret } from "./lib/auth";
 import { startJob, cancelJob, retryJob } from "./lib/jobLifecycle";
 import { v } from "convex/values";
 import {
@@ -9,12 +10,6 @@ import {
   jobStatusValidator,
 } from "./jobCatalog";
 
-function requireSecret(serverSecret: string) {
-  const expected = process.env.CONVEX_SERVER_SECRET;
-  if (!expected || serverSecret !== expected)
-    throw new Error("Unauthorized server request");
-}
-
 function publicRun(row: Record<string, unknown> & { _id: string }) {
   return { ...row, id: row._id };
 }
@@ -22,7 +17,7 @@ function publicRun(row: Record<string, unknown> & { _id: string }) {
 export const catalog = query({
   args: { serverSecret: v.string() },
   handler: (_ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     return { jobs: JOB_NAMES, statuses: JOB_STATUSES };
   },
 });
@@ -36,7 +31,7 @@ export const start = mutation({
     requestedBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     return publicRun(
       await startJob(ctx, {
         jobName: args.jobName,
@@ -55,7 +50,7 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     const limit = Math.max(1, Math.min(args.limit ?? 50, 200));
     const rows = args.status
       ? await ctx.db
@@ -74,7 +69,7 @@ export const list = query({
 export const inspect = query({
   args: { serverSecret: v.string(), runId: v.id("jobRuns") },
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     const run = await ctx.db.get(args.runId);
     if (!run) return null;
     const [events, artifacts, tasks, children] = await Promise.all([
@@ -109,7 +104,7 @@ export const inspect = query({
 export const cancel = mutation({
   args: { serverSecret: v.string(), runId: v.id("jobRuns") },
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     return publicRun(await cancelJob(ctx, args.runId));
   },
 });
@@ -121,7 +116,7 @@ export const retry = mutation({
     requestedBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     return publicRun(await retryJob(ctx, args.runId, args.requestedBy));
   },
 });
@@ -140,7 +135,7 @@ const scheduleFields = {
 export const createSchedule = mutation({
   args: scheduleFields,
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     canonicalJobName(args.jobName);
     if (args.intervalMinutes < 1)
       throw new Error("intervalMinutes must be at least 1");
@@ -162,7 +157,7 @@ export const createSchedule = mutation({
 export const updateSchedule = mutation({
   args: { ...scheduleFields, scheduleId: v.id("jobSchedules") },
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     canonicalJobName(args.jobName);
     await ctx.db.patch(args.scheduleId, {
       name: args.name,
@@ -185,7 +180,7 @@ export const setScheduleEnabled = mutation({
     enabled: v.boolean(),
   },
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     await ctx.db.patch(args.scheduleId, {
       enabled: args.enabled,
       updatedAt: Date.now(),
@@ -196,7 +191,7 @@ export const setScheduleEnabled = mutation({
 export const listSchedules = query({
   args: { serverSecret: v.string() },
   handler: async (ctx, args) => {
-    requireSecret(args.serverSecret);
+    requireServerSecret(args.serverSecret);
     return await ctx.db.query("jobSchedules").collect();
   },
 });

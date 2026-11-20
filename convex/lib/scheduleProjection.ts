@@ -4,6 +4,7 @@ import {
   resolveMatchupScore,
 } from "../../src/lib/utils/features/matchup-details";
 import { projectMatchupTeamWeekStats } from "./matchupProjection";
+import { projectMatchupOutcome } from "./publicProjection";
 
 type WeeklyScheduleMatchupSource = {
   _id: string;
@@ -33,36 +34,6 @@ type WeeklyScheduleFranchiseSource = {
 type WeeklyScheduleConferenceSource = {
   abbr: string;
 };
-
-const PLAYOFF_GAME_TYPES = new Set(["QF", "SF", "F"]);
-
-function projectMatchupOutcome(row: WeeklyScheduleMatchupSource) {
-  if (
-    !PLAYOFF_GAME_TYPES.has(row.gameType) ||
-    (!row.isComplete && row.tie !== true)
-  ) {
-    return {
-      homeWin: row.homeWin ?? null,
-      awayWin: row.awayWin ?? null,
-    };
-  }
-
-  if (row.homeScore != null && row.awayScore != null) {
-    return {
-      homeWin: row.homeScore >= row.awayScore,
-      awayWin: row.awayScore > row.homeScore,
-    };
-  }
-
-  if (row.tie === true) {
-    return { homeWin: true, awayWin: false };
-  }
-
-  return {
-    homeWin: row.homeWin ?? null,
-    awayWin: row.awayWin ?? null,
-  };
-}
 
 /** Sorts weekly matchups by display priority and removes non-rendered fields. */
 export function projectWeeklyScheduleMatchups(

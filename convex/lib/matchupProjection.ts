@@ -1,3 +1,4 @@
+import { projectMatchupOutcome } from "./publicProjection";
 import { projectPlayerWeekRating } from "../../src/lib/utils/domain/player-week-rating";
 import { projectGshlPerformanceRating } from "../../src/lib/utils/domain/gshl-performance-rating";
 
@@ -110,42 +111,9 @@ type NhlTeamSource = {
   logoUrl: string;
 };
 
-const PLAYOFF_GAME_TYPES = new Set(["QF", "SF", "F"]);
-
-function projectOutcome(matchup: MatchupSource) {
-  if (
-    !PLAYOFF_GAME_TYPES.has(matchup.gameType) ||
-    (!matchup.isComplete && matchup.tie !== true)
-  ) {
-    return {
-      homeWin: matchup.homeWin ?? null,
-      awayWin: matchup.awayWin ?? null,
-      tie: matchup.tie ?? null,
-    };
-  }
-
-  if (matchup.homeScore != null && matchup.awayScore != null) {
-    return {
-      homeWin: matchup.homeScore >= matchup.awayScore,
-      awayWin: matchup.awayScore > matchup.homeScore,
-      tie: false,
-    };
-  }
-
-  if (matchup.tie === true) {
-    return { homeWin: true, awayWin: false, tie: false };
-  }
-
-  return {
-    homeWin: matchup.homeWin ?? null,
-    awayWin: matchup.awayWin ?? null,
-    tie: matchup.tie ?? null,
-  };
-}
-
 /** Projects the selected matchup and preserves the playoff tiebreak outcome. */
 export function projectMatchupDetailsMatchup(matchup: MatchupSource) {
-  const outcome = projectOutcome(matchup);
+  const outcome = projectMatchupOutcome(matchup);
   return {
     id: matchup._id,
     seasonId: matchup.seasonId,

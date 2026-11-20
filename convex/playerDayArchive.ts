@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/prefer-optional-chain */
+import { requireServerSecret } from "./lib/auth";
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 import { syncPlayerDayPerformanceIndex } from "./lib/playerDayPerformanceIndex";
@@ -6,13 +7,6 @@ import { syncPlayerDayPerformanceIndex } from "./lib/playerDayPerformanceIndex";
 const ARCHIVE_VERSION = 1;
 const MAX_DELETE_BATCH = 20;
 const MAX_HIGHLIGHT_BATCH = 20;
-
-function requireServerSecret(serverSecret: string) {
-  const expected = process.env.CONVEX_SERVER_SECRET;
-  if (!expected || serverSecret !== expected) {
-    throw new Error("Unauthorized server request");
-  }
-}
 
 function canonicalValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalValue);

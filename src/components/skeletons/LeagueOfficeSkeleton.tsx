@@ -56,34 +56,6 @@ export function OwnerRankingsSkeleton() {
   );
 }
 
-export function RulebookSkeleton() {
-  return (
-    <article className="mx-auto max-w-4xl space-y-8 pb-12">
-      <header className="space-y-3 border-b border-slate-200 pb-6 text-center">
-        <Skeleton className="mx-auto h-10 w-60" />
-        <Skeleton className="mx-auto h-4 w-96 max-w-[85%]" />
-      </header>
-      {Array.from({ length: 4 }).map((_, sectionIndex) => (
-        <section
-          key={sectionIndex}
-          className="space-y-3 rounded-xl border border-slate-200 bg-white p-5"
-        >
-          <Skeleton className="h-7 w-48 max-w-[60%]" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-[92%]" />
-          <Skeleton className="h-4 w-[76%]" />
-          {sectionIndex % 2 === 0 ? (
-            <div className="grid gap-3 pt-2 sm:grid-cols-2">
-              <Skeleton className="h-24 rounded-lg" />
-              <Skeleton className="h-24 rounded-lg" />
-            </div>
-          ) : null}
-        </section>
-      ))}
-    </article>
-  );
-}
-
 export function FreeAgencySkeleton() {
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -156,17 +128,5 @@ export function LeagueOfficeRouteSkeleton() {
       </h1>
       <LeagueOfficeSkeleton />
     </main>
-  );
-}
-
-export function FreeAgencyListSkeleton() {
-  return (
-    <div className="mt-8">
-      <Skeleton className="mb-2 h-8 w-48" />
-      <Skeleton className="mb-4 h-3 w-64" />
-      <div className="overflow-hidden rounded-lg border">
-        <TableRowsSkeleton columns={6} rows={10} />
-      </div>
-    </div>
   );
 }

@@ -2,8 +2,7 @@
 
 import { useMemo } from "react";
 import { usePaginatedQuery, useQuery } from "convex/react";
-import type { FunctionArgs } from "convex/server";
-import { useDomainMutation } from "./useDomainMutation";
+
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
@@ -11,7 +10,6 @@ import type {
   PlayerRankField,
   UsePlayerPagesOptions,
   UsePlayersOptions,
-  UseRankedPlayersOptions,
   UseRosterPlayersOptions,
 } from "@gshl-types";
 
@@ -117,47 +115,6 @@ export function useRosterPlayers(options: UseRosterPlayersOptions = {}) {
   };
 }
 
-export function useRankedPlayers(options: UseRankedPlayersOptions = {}) {
-  const {
-    rankField = "overallRk",
-    minRank,
-    maxRank,
-    limit,
-    sortDirection = "asc",
-    ...rest
-  } = options;
-  const query = usePlayers(rest);
-  const data = useMemo(() => {
-    const filtered = query.data.filter((player) => {
-      const rank = getPlayerRankValue(player, rankField);
-      return (
-        rank != null &&
-        (minRank === undefined || rank >= minRank) &&
-        (maxRank === undefined || rank <= maxRank)
-      );
-    });
-    filtered.sort((a, b) => {
-      const delta =
-        (getPlayerRankValue(a, rankField) ?? 0) -
-        (getPlayerRankValue(b, rankField) ?? 0);
-      return sortDirection === "desc" ? -delta : delta;
-    });
-    return limit === undefined ? filtered : filtered.slice(0, limit);
-  }, [query.data, rankField, minRank, maxRank, limit, sortDirection]);
-  return { ...query, data };
-}
-
 function getPlayerRankValue(player: Player, field: PlayerRankField) {
   return player[field] ?? null;
-}
-
-export function useUpdatePlayer() {
-  return useDomainMutation(
-    api.frontend.updatePlayer,
-    (
-      args: Omit<FunctionArgs<typeof api.frontend.updatePlayer>, "id"> & {
-        id: string;
-      },
-    ) => ({ ...args, id: args.id as Id<"players"> }),
-  );
 }

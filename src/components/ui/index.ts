@@ -33,9 +33,6 @@ export {
   DropdownMenuRadioGroup,
 } from "./DropdownMenuPrimitive";
 
-// Loading Components
-export { LoadingSpinner } from "./LoadingSpinnerPrimitive";
-
 // Popover Components
 export {
   Popover,
