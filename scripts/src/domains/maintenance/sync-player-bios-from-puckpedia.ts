@@ -1,3 +1,4 @@
+import { toText } from "../../utils/data";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -329,18 +330,6 @@ Options:
   --log <true|false>      Enable progress logging. Default: true.
   --help                  Show this help text.
 `.trim();
-
-function toText(value: unknown): string {
-  if (
-    value === null ||
-    value === undefined ||
-    typeof value === "object" ||
-    typeof value === "symbol"
-  ) {
-    return "";
-  }
-  return String(value).trim();
-}
 
 function getArgValue(args: string[], name: string): string | undefined {
   const exactIndex = args.indexOf(name);

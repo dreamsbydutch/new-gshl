@@ -12,61 +12,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/**
- * Formats player name for display.
- *
- * @param name - The name to use.
- * @returns The formatted player name.
- */
-export function formatPlayerName(name: string): string {
-  return name
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-}
-
 /** Shorten only the first name, preserving compound surnames and punctuation. */
 export function abbreviatePlayerName(name: string): string {
   const [first = "", ...rest] = name.trim().split(/\s+/);
   return rest.length ? `${Array.from(first)[0]}. ${rest.join(" ")}` : first;
-}
-
-/**
- * Formats team name for display.
- *
- * @param name - The name to use.
- * @param location - The location to use.
- * @returns The formatted team name.
- */
-export function formatTeamName(name: string, location?: string): string {
-  if (location) {
-    return `${location} ${name}`;
-  }
-  return name;
-}
-
-/**
- * Truncate text.
- *
- * @param text - The text to use.
- * @param maxLength - The max length to use.
- * @returns The resulting truncate text.
- */
-export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - 3) + "...";
-}
-
-/**
- * Formats stat for display.
- *
- * @param stat - The stat to use.
- * @param decimals - The decimals to use.
- * @returns The formatted stat.
- */
-export function formatStat(stat: number | string, decimals = 0): string {
-  const value = toNumber(stat, 0);
-  return value.toFixed(decimals);
 }
 
 /**
@@ -104,27 +53,6 @@ export function formatNumber(
     }).format(num);
   } catch {
     return String(num);
-  }
-}
-
-/**
- * Formats compact number for display.
- *
- * @param value - The source value to process.
- * @returns The formatted compact number.
- */
-export function formatCompactNumber(
-  value: number | string | null | undefined,
-): string {
-  const num = toNumber(value, 0);
-
-  try {
-    return Intl.NumberFormat("en-US", {
-      notation: "compact",
-      maximumFractionDigits: 1,
-    }).format(num);
-  } catch {
-    return formatNumber(num);
   }
 }
 
@@ -183,21 +111,6 @@ export function formatPercentage(
     const fallback = asDecimal ? num * 100 : num;
     return `${fallback.toFixed(1)}%`;
   }
-}
-
-/**
- * Formats rank for display.
- *
- * @param value - The source value to process.
- * @returns The formatted rank.
- */
-export function formatRank(value: number | string | null | undefined): string {
-  const num = Math.trunc(toNumber(value, 0));
-  if (num <= 0) return "0th";
-  if (num >= 11 && num <= 13) return `${num}th`;
-
-  const lastDigit = num % 10;
-  return `${num}${["th", "st", "nd", "rd"][lastDigit] ?? "th"}`;
 }
 
 /**

@@ -9,15 +9,6 @@ import type {
 import type { ContractFilters, ContractSortOption } from "./contracts";
 import type { ReadQueryResult, QueryState } from "./hook-query";
 
-export interface UseAwardsOptions {
-  awardId?: string;
-  winnerId?: string;
-  seasonId?: string;
-  award?: string;
-  enabled?: boolean;
-  orderBy?: Record<string, "asc" | "desc">;
-}
-
 export interface UsePlayerAwardsOptions {
   playerId?: string;
   seasonId?: string;
@@ -68,14 +59,6 @@ export interface UsePlayerPagesOptions {
 }
 
 export type PlayerRankField = "overallRk" | "seasonRk" | "preDraftRk";
-
-export interface UseRankedPlayersOptions extends UsePlayersOptions {
-  rankField?: PlayerRankField;
-  minRank?: number;
-  maxRank?: number;
-  limit?: number;
-  sortDirection?: "asc" | "desc";
-}
 
 export interface UseRosterPlayersOptions
   extends Omit<UsePlayersOptions, "ownerId"> {

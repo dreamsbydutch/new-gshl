@@ -1,3 +1,4 @@
+import { toText } from "../../utils/data";
 import type { DirectoryPlayer } from "./player-directory";
 
 import {
@@ -102,18 +103,6 @@ const CONTAINER_KEYS = new Set([
   "salaryHistory",
   "playerNhlSalaries",
 ]);
-
-function toText(value: unknown): string {
-  if (
-    value === null ||
-    value === undefined ||
-    typeof value === "object" ||
-    typeof value === "symbol"
-  ) {
-    return "";
-  }
-  return String(value).trim();
-}
 
 function firstPresent(
   row: Record<string, unknown>,

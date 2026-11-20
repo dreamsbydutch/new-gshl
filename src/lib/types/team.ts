@@ -15,8 +15,6 @@ import type {
   TeamAward,
   TeamWeekStatLine,
 } from "./database";
-import type { MatchupTeamWeekStats } from "./matchup";
-import type { TeamScheduleTeamSummary } from "./team-schedule";
 
 export type TeamRelations = {
   franchises?: Franchise[];
@@ -91,25 +89,6 @@ export type MatchupCategoryConfig = {
   isInverse?: boolean;
   precision?: number;
 };
-
-export interface TeamStatsRowProps {
-  team?: TeamScheduleTeamSummary | null;
-  teamStats: MatchupTeamWeekStats;
-  opponentStats: MatchupTeamWeekStats;
-  teamScore: number | null;
-  opponentScore: number | null;
-  categories: MatchupCategoryConfig[];
-}
-
-export interface MatchupStatsTableProps {
-  selectedTeam: TeamScheduleTeamSummary | null;
-  selectedTeamStats: MatchupTeamWeekStats;
-  selectedTeamScore: number | null;
-  opponentTeam: TeamScheduleTeamSummary | null;
-  opponentStats: MatchupTeamWeekStats;
-  opponentScore: number | null;
-  categories: MatchupCategoryConfig[];
-}
 
 export interface RecordBookStatLine {
   days: number;

@@ -1,3 +1,4 @@
+import { toText } from "../../utils/data";
 import type { PlayerActivityEvidence } from "./player-activity";
 
 export type PuckPediaRow = Record<string, unknown>;
@@ -283,18 +284,6 @@ const SPECIAL_LETTERS: Record<string, string> = {
   ß: "ss",
   þ: "th",
 };
-
-function toText(value: unknown): string {
-  if (
-    value === null ||
-    value === undefined ||
-    typeof value === "object" ||
-    typeof value === "symbol"
-  ) {
-    return "";
-  }
-  return String(value).trim();
-}
 
 function cleanDisplayText(value: unknown): string {
   return toText(value).normalize("NFC").replace(/\s+/g, " ");

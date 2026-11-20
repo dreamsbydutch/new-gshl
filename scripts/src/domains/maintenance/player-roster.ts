@@ -1,3 +1,4 @@
+import { toText } from "../../utils/data";
 export type RosterSeason = Record<string, unknown> & {
   id: string;
   legacyId?: unknown;
@@ -148,18 +149,6 @@ export type RosterReconciliation = {
   updateReviews: RosterUpdateReview[];
   issues: RosterIssue[];
 };
-
-function toText(value: unknown): string {
-  if (
-    value === null ||
-    value === undefined ||
-    typeof value === "object" ||
-    typeof value === "symbol"
-  ) {
-    return "";
-  }
-  return String(value).trim();
-}
 
 function dateOnly(value: unknown): string {
   const match = /^(\d{4}-\d{2}-\d{2})/.exec(toText(value));

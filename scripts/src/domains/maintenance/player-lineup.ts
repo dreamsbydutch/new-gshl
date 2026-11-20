@@ -1,3 +1,4 @@
+import { toText } from "../../utils/data";
 import type { RosterPlayer } from "./player-roster";
 
 export type LineupPlayer = RosterPlayer & {
@@ -50,18 +51,6 @@ type OptimizerPlayer = {
 type FindBestLineup = (
   players: Array<Record<string, unknown>>,
 ) => Record<string, string>;
-
-function toText(value: unknown): string {
-  if (
-    value === null ||
-    value === undefined ||
-    typeof value === "object" ||
-    typeof value === "symbol"
-  ) {
-    return "";
-  }
-  return String(value).trim();
-}
 
 function toRating(value: unknown): number {
   const parsed = Number(toText(value).replace(/[,\s]/g, ""));

@@ -12,7 +12,7 @@ import type {
 import type { FranchiseContractView } from "./contracts";
 import type { ProcessedDraftPick } from "./draft-ui";
 import type { UseTeamSeasonStatsOptions } from "./hook-core";
-import type { ReadQueryResult, QueryState } from "./hook-query";
+import type { ReadQueryResult } from "./hook-query";
 import type { PowerRankingsViewModel, StandingsGroup } from "./standings";
 import type {
   TeamHistoryMatchupSummary,
@@ -75,20 +75,6 @@ export interface UseScheduleDataResult {
   error: Error | null;
 }
 
-export interface UseSeasonMatchupsAndTeamsOptions {
-  seasonId: string | null;
-  weekId?: string | null;
-}
-
-export interface UseSeasonMatchupsAndTeamsResult {
-  matchups: Matchup[];
-  teams: GSHLTeam[];
-  status: QueryState;
-  matchupsQuery: ReadQueryResult<Matchup[]>;
-  teamsQuery: ReadQueryResult<GSHLTeam[]>;
-  isWeekScoped: boolean;
-}
-
 export interface UseSeasonDataBundleOptions {
   seasonId?: string | null;
   weekId?: string | null;
@@ -126,38 +112,9 @@ export interface DraftCountdownState {
   countdown: string | null;
 }
 
-export interface UseFreeAgencyDataOptions {
-  minRating?: number;
-  sortDirection?: "asc" | "desc";
-}
-
 export interface UseDraftBoardDataOptions {
   seasonId: string;
   selectedType?: string | null;
-}
-
-export interface UseDraftAdminListOptions {
-  seasonId?: string;
-}
-
-export interface DraftAdminListViewModel {
-  searchTerm: string;
-  setSearchTerm: (value: string) => void;
-  draftingPlayerId: string | null;
-  filteredFreeAgents: Player[];
-  freeAgentsCount: number;
-  nhlTeams: NHLTeam[];
-  playersLoading: boolean;
-  activeDraftPick: DraftPick | null;
-  activeDraftTeam: GSHLTeam | null;
-  lastCompletedPlayer: Player | null;
-  isDraftPending: boolean;
-  isUndoPending: boolean;
-  isPlayerUpdatePending: boolean;
-  undoDisabled: boolean;
-  handleDraftPlayer: (player: Player) => Promise<void>;
-  handleUndoLastPick: () => Promise<void>;
-  isLoading: boolean;
 }
 
 export interface UseTeamHistoryDataOptions {
@@ -199,23 +156,6 @@ export interface UseTeamDraftPickListDataResult {
   resolvedTeamId?: string;
   isLoading: boolean;
   error: Error | null;
-}
-
-export interface UseTeamDraftPickHistoryDataOptions {
-  currentTeam: GSHLTeam;
-  seasons?: Season[];
-  enabled?: boolean;
-}
-
-export interface UseTeamDraftPickHistoryDataResult {
-  draftPicks: DraftPick[];
-  isLoading: boolean;
-  players: Player[];
-  seasonOptions: Season[];
-  selectedSeasonId: string | null;
-  selectedTeam?: GSHLTeam;
-  selectSeason: (seasonId: string) => void;
-  teams: GSHLTeam[];
 }
 
 export type UseTeamScheduleEnhancedMatchup = TeamScheduleRow;

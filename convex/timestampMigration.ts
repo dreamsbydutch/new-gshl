@@ -1,3 +1,4 @@
+import { requireServerSecret } from "./lib/auth";
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -7,13 +8,6 @@ import {
   toUtcTimestamp,
   UTC_TIMESTAMP_TABLE_FIELDS,
 } from "./lib/timestamps";
-
-function requireServerSecret(serverSecret: string) {
-  const expected = process.env.CONVEX_SERVER_SECRET;
-  if (!expected || serverSecret !== expected) {
-    throw new Error("Unauthorized server request");
-  }
-}
 
 function requireTimestampTable(table: string): readonly string[] {
   const fields = timestampFieldsForTable(table);

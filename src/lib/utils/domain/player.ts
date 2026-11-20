@@ -3,9 +3,7 @@
  * -----------------------
  * Pure functions for player data filtering, sorting, and transformations.
  */
-
 import type { NHLTeam, Player } from "@gshl-types";
-import { isTruthy } from "../core/validation";
 
 type PlayerTeamCarrier = Pick<Player, "nhlTeam">;
 type PlayerTeamInput = string | string[] | PlayerTeamCarrier | null | undefined;
@@ -55,108 +53,6 @@ const NHL_LOGO_URL_BY_IDENTIFIER = new Map<string, string>(
     ),
   ),
 );
-
-/**
- * Checks whether active player.
- *
- * @param p - The p to use.
- * @returns True when active player; otherwise false.
- */
-export const isActivePlayer = (p: Pick<Player, "isActive">): boolean =>
-  isTruthy(p.isActive);
-
-/**
- * Checks whether signable player.
- *
- * @param p - The p to use.
- * @returns True when signable player; otherwise false.
- */
-export const isSignablePlayer = (p: Pick<Player, "isSignable">): boolean =>
-  isTruthy(p.isSignable);
-
-/**
- * Filters free agents.
- *
- * @param players - The players to use.
- * @param checkTeamAssignment - The check team assignment to use.
- * @returns The filtered free agents.
- */
-export function filterFreeAgents(
-  players: Player[],
-  checkTeamAssignment = false,
-): Player[] {
-  let result = players.filter((p) => isActivePlayer(p) && isSignablePlayer(p));
-
-  if (checkTeamAssignment) {
-    result = result.filter((p) => !p.ownerId || p.ownerId.trim() === "");
-  }
-
-  return result;
-}
-
-/**
- * Filters players by min rating.
- *
- * @param players - The players to use.
- * @param minRating - The min rating to use.
- * @returns The filtered players by min rating.
- */
-export function filterPlayersByMinRating(
-  players: Player[],
-  minRating: number,
-): Player[] {
-  return players.filter((p) => (p.overallRating ?? 0) >= minRating);
-}
-
-/**
- * Sorts players by rating.
- *
- * @param players - The players to use.
- * @param direction - The direction to apply.
- * @returns The sorted players by rating.
- */
-export function sortPlayersByRating(
-  players: Player[],
-  direction: "asc" | "desc" = "desc",
-): Player[] {
-  return [...players].sort((a, b) => {
-    const aRating = a.overallRating ?? 0;
-    const bRating = b.overallRating ?? 0;
-    return direction === "desc" ? bRating - aRating : aRating - bRating;
-  });
-}
-
-/**
- * Get free agents filtered and sorted by criteria
- *
- * @param players - Array of players to process
- * @param options - Filtering and sorting options
- * @param options.minRating - Minimum overall rating filter
- * @param options.sortDirection - Sort direction (default: "desc")
- * @param options.checkTeamAssignment - If true, excludes players already assigned to teams
- */
-export function getFreeAgents(
-  players: Player[],
-  options: {
-    minRating?: number;
-    sortDirection?: "asc" | "desc";
-    checkTeamAssignment?: boolean;
-  } = {},
-): Player[] {
-  const {
-    minRating,
-    sortDirection = "desc",
-    checkTeamAssignment = false,
-  } = options;
-
-  let result = filterFreeAgents(players, checkTeamAssignment);
-
-  if (minRating !== undefined) {
-    result = filterPlayersByMinRating(result, minRating);
-  }
-
-  return sortPlayersByRating(result, sortDirection);
-}
 
 // Alternate abbreviations in the NHL catalog and supported stat sources.
 const NHL_TEAM_ABBREVIATION_ALIASES: Readonly<Record<string, string>> = {

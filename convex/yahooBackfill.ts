@@ -1,13 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+import { requireServerSecret } from "./lib/auth";
 import { queryGeneric } from "convex/server";
 import { v } from "convex/values";
-
-function requireServerSecret(serverSecret: string) {
-  const expected = process.env.CONVEX_SERVER_SECRET;
-  if (!expected || serverSecret !== expected) {
-    throw new Error("Unauthorized server request");
-  }
-}
 
 export const listPlayerDayRows = queryGeneric({
   args: {

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+import { requireServerSecret } from "./lib/auth";
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { normalizeTimestampFields } from "./lib/timestamps";
@@ -79,13 +80,6 @@ function diagnosticValue(value: unknown): string {
     return String(value);
   }
   return value === null || value === undefined ? "" : JSON.stringify(value);
-}
-
-function requireServerSecret(serverSecret: string) {
-  const expected = process.env.CONVEX_SERVER_SECRET;
-  if (!expected || serverSecret !== expected) {
-    throw new Error("Unauthorized server request");
-  }
 }
 
 export const listWeekRows = queryGeneric({

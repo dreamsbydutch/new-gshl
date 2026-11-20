@@ -1,3 +1,4 @@
+import { requireServerSecret } from "./lib/auth";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { validateAuthUserOwnerLink } from "./lib/authUserOwnerLink";
@@ -8,13 +9,6 @@ const role = v.union(
   v.literal("commissioner"),
 );
 const status = v.union(v.literal("active"), v.literal("disabled"));
-
-function requireServerSecret(serverSecret: string) {
-  const expected = process.env.CONVEX_SERVER_SECRET;
-  if (!expected || serverSecret !== expected) {
-    throw new Error("Unauthorized server request");
-  }
-}
 
 function publicUser(user: {
   _id: string;

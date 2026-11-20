@@ -1,3 +1,4 @@
+import { toText } from "../../utils/data";
 export type ActivityPlayer = Record<string, unknown> & {
   id: string;
 };
@@ -33,18 +34,6 @@ export type PlayerActivityContext = {
   previousSeasonYear: number | null;
   evidenceByPlayerId: ReadonlyMap<string, PlayerActivityEvidence>;
 };
-
-function toText(value: unknown): string {
-  if (
-    value === null ||
-    value === undefined ||
-    typeof value === "object" ||
-    typeof value === "symbol"
-  ) {
-    return "";
-  }
-  return String(value).trim();
-}
 
 function toNumber(value: unknown): number | null {
   const number = Number(toText(value).replace(/[,\s]/g, ""));
