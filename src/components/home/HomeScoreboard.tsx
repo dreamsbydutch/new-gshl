@@ -36,16 +36,16 @@ export function HomeScoreboard({
     useHomeScoreboard(seasonId, ownerTeamId);
   const track = useRef<HTMLUListElement>(null);
   const currentWeekStart = useRef<HTMLLIElement>(null);
-  const firstCurrentMatchupId = matchupGroups.find(
-    (group) => group.isCurrentWeek,
-  )?.matchups[0]?.matchup.id;
+  const positionedTrack = useRef<HTMLUListElement | null>(null);
+  const hasCurrentWeek = matchupGroups.some((group) => group.isCurrentWeek);
   useEffect(() => {
     const list = track.current;
     const item = currentWeekStart.current;
-    if (isLoading || isScheduleLoading || !list || !item) return;
+    if (!list || !item || positionedTrack.current === list) return;
     list.scrollLeft +=
       item.getBoundingClientRect().left - list.getBoundingClientRect().left - 2;
-  }, [week?.id, firstCurrentMatchupId, isLoading, isScheduleLoading]);
+    positionedTrack.current = list;
+  }, [week?.id, hasCurrentWeek, isLoading, isScheduleLoading, error]);
   if (isLoading) return <HomeScoreboardSkeleton />;
 
   return (
