@@ -5,6 +5,7 @@ import type { Contract, NHLTeam, UseTeamRosterDataOptions } from "@gshl-types";
 import { useNHLTeams } from "../main";
 import { getContractedRosterPlayerIds } from "@gshl-utils/features/team-roster";
 import { useLeagueToday } from "./useLeagueToday";
+import { toIsoDateOnly } from "@gshl-utils/core/date";
 import { useTeamRosterData } from "./useTeamRosterData";
 
 export function useTeamRosterView(
@@ -24,7 +25,7 @@ export function useTeamRosterView(
     [nhlTeams],
   );
 
-  const today = useLeagueToday();
+  const today = useLeagueToday(toIsoDateOnly);
   const contractedPlayerIds = useMemo(
     () =>
       getContractedRosterPlayerIds(
