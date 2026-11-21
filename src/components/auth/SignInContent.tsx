@@ -21,7 +21,7 @@ export function SignInContent({
         />
         <h1 className="text-2xl font-bold">Sign in to GSHL</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Open My Team, Draft, and League Office.
+          Access My Team, player research, free agency, and draft tools.
         </p>
         {error ? (
           <p className="mt-4 border-y border-red-200 py-2 text-sm text-red-700">

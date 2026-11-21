@@ -1,11 +1,7 @@
 "use client";
 
 import { useStandingsContextNavigation } from "@gshl-hooks";
-import {
-  HorizontalToggle,
-  PageContextNavigation,
-  SecondaryPageToolbar,
-} from "@gshl-nav";
+import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
 import type { LabeledToggleOption } from "@gshl-types";
 import { StandingsSkeleton } from "@gshl-skeletons";
 
@@ -18,8 +14,8 @@ export function StandingsLayout({ children }: { children: React.ReactNode }) {
     { key: "overall", label: "Overall" },
     { key: "conference", label: "Conference" },
     { key: "wildcard", label: "Wildcard" },
-    { key: "power", label: "Power" },
-    { key: "playoff", label: "Playoff" },
+    { key: "power", label: "Power rankings" },
+    { key: "playoff", label: "Playoffs" },
     { key: "awards", label: "Awards" },
     { key: "nhl", label: "NHL" },
   ];
@@ -29,7 +25,11 @@ export function StandingsLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="font-varela">
-      <PageContextNavigation ariaLabel="Standings controls">
+      <div
+        className="gshl-local-controls"
+        role="group"
+        aria-label="Standings views"
+      >
         <SecondaryPageToolbar className="text-center sm:justify-center">
           <HorizontalToggle<LabeledToggleOption>
             items={standingsTypes}
@@ -52,7 +52,7 @@ export function StandingsLayout({ children }: { children: React.ReactNode }) {
             itemClassName="text-sm"
           />
         </SecondaryPageToolbar>
-      </PageContextNavigation>
+      </div>
       <main aria-labelledby="standings-page-heading">
         <h1 id="standings-page-heading" className="sr-only">
           Standings

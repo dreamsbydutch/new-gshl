@@ -9,7 +9,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, House, Shirt, Trophy } from "lucide-react";
+import {
+  ArrowLeft,
+  House,
+  Shirt,
+  Trophy,
+  CalendarDays,
+  BookOpenText,
+} from "lucide-react";
 import { useAppPathname, useGlobalSeasonContextNavigation } from "@gshl-hooks";
 import {
   calculatePageScrollProgress,
@@ -18,6 +25,7 @@ import {
 } from "@gshl-utils";
 import { NavContainer, LinkNavItem } from "./BaseComponents";
 import type { LinkNavItem as LinkNavItemType, NavbarProps } from "@gshl-types";
+import { useOwnerTeam } from "@gshl-hooks/features/useOwnerTeam";
 import { AuthNavControl } from "@gshl-components/auth";
 import { HeaderTeamSelect } from "./HeaderTeamSelect";
 import { MoreNavigationMenu } from "./MoreNavigationMenu";
@@ -32,6 +40,7 @@ import {
  * @returns Primary navigation bar with route-based active states
  */
 export function MainNavbar({ className, search = "" }: NavbarProps) {
+  const owner = useOwnerTeam();
   const { pathname } = useAppPathname();
   const routeContext = getAppShellRouteContext(pathname, search);
   const showTeamControl = pathname === "/lockerroom";
@@ -82,9 +91,17 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
       icon: <House className="h-5 w-5" aria-hidden="true" />,
     },
     {
+      id: "lockerroom",
+      label: owner.team ? "My Team" : "Teams",
+      href: owner.team
+        ? `/lockerroom?view=roster&owner=${owner.ownerId}&season=${owner.team.seasonId}`
+        : "/teams",
+      icon: <Shirt className="h-5 w-5" aria-hidden="true" />,
+    },
+    {
       id: "schedule",
-      label: "Schedule",
-      href: "/schedule",
+      label: "Matchups",
+      href: "/schedule?view=week",
       icon: <CalendarDays className="h-5 w-5" aria-hidden="true" />,
     },
     {
@@ -93,24 +110,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
       href: "/standings",
       icon: <Trophy className="h-5 w-5" aria-hidden="true" />,
     },
-    {
-      id: "lockerroom",
-      label: "My Team",
-      href: "/lockerroom",
-      icon: <Shirt className="h-5 w-5" aria-hidden="true" />,
-    },
   ];
-  const mobileNavItems: LinkNavItemType[] = routeContext.backHref
-    ? [
-        {
-          id: "back",
-          label: "Back",
-          href: routeContext.backHref,
-          icon: <ArrowLeft className="h-5 w-5" aria-hidden="true" />,
-        },
-        ...navItems.slice(1),
-      ]
-    : navItems;
   const seasonControlProps = seasonNavigation.selectedSeasonSummary
     ? {
         currentSeason: seasonNavigation.currentSeasonSummary,
@@ -124,7 +124,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-800 bg-slate-950 pt-[env(safe-area-inset-top)] text-white shadow-sm lg:hidden print:hidden">
-        <div className="grid h-[var(--app-mobile-header-height)] grid-cols-[4rem_minmax(0,1fr)_7.5rem] items-center px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">
+        <div className="grid h-[var(--app-mobile-header-height)] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">
           <Link
             href="/"
             aria-label="GSHL home"
@@ -142,6 +142,15 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             <span className="sr-only">GSHL</span>
           </Link>
           <div className="flex min-w-0 items-center justify-center gap-1.5 px-1">
+            {routeContext.backHref ? (
+              <Link
+                href={routeContext.backHref}
+                aria-label={routeContext.backLabel}
+                className="flex h-11 w-9 shrink-0 items-center justify-center rounded focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            ) : null}
             {showTeamControl ? (
               <HeaderTeamSelect />
             ) : (
@@ -152,7 +161,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
                     "hidden min-[360px]:block",
                 )}
               >
-                {routeContext.title}
+                {pathname === "/lockerroom" ? "Team" : routeContext.title}
               </p>
             )}
             {seasonNavigation.showSeasonControl &&
@@ -165,7 +174,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
                 <GlobalSeasonSelectFallback placement="mobile" />
               ))}
           </div>
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-1">
             <AuthNavControl compact />
           </div>
         </div>
@@ -184,7 +193,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
         <div
           className={cn(
             className,
-            "mx-auto flex h-[var(--app-primary-nav-height)] w-full max-w-7xl items-stretch px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] lg:items-center lg:gap-4 lg:px-5",
+            "mx-auto flex h-[var(--app-primary-nav-height)] w-full max-w-7xl items-stretch px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] lg:items-center lg:gap-2 lg:px-3 xl:gap-4 xl:px-5",
           )}
         >
           <Link
@@ -201,10 +210,10 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
               className="h-8 w-8 rounded-full object-contain"
               priority
             />
-            <span>GSHL</span>
+            <span className="hidden xl:inline">GSHL</span>
           </Link>
           <div className="flex min-w-0 flex-1 items-stretch justify-around lg:hidden">
-            {mobileNavItems.map((item) => (
+            {navItems.map((item) => (
               <LinkNavItem
                 key={item.id}
                 {...item}
@@ -214,7 +223,10 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             ))}
             <MoreNavigationMenu
               pathname={pathname}
-              isActive={routeContext.activeNavId === "more"}
+              isActive={
+                routeContext.activeNavId === "more" ||
+                routeContext.activeNavId === "rulebook"
+              }
               placement="mobile"
             />
           </div>
@@ -224,9 +236,17 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
                 key={item.id}
                 {...item}
                 isActive={routeContext.activeNavId === item.id}
-                className="h-11 flex-none flex-row gap-2 px-3 py-2 text-sm"
+                className="h-11 flex-none flex-row gap-1.5 px-2 py-2 text-sm xl:gap-2 xl:px-3"
               />
             ))}
+            <LinkNavItem
+              id="rulebook"
+              label="Rulebook"
+              href="/rulebook"
+              icon={<BookOpenText className="h-5 w-5" aria-hidden="true" />}
+              isActive={routeContext.activeNavId === "rulebook"}
+              className="h-11 flex-none flex-row gap-1.5 px-2 py-2 text-sm xl:gap-2 xl:px-3"
+            />
             <MoreNavigationMenu
               pathname={pathname}
               isActive={routeContext.activeNavId === "more"}
@@ -234,6 +254,12 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             />
           </div>
           <div className="hidden shrink-0 lg:block">
+            {routeContext.backHref ? (
+              <Link href={routeContext.backHref} className="gshl-text-action">
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                {routeContext.backLabel}
+              </Link>
+            ) : null}
             {showTeamControl && <HeaderTeamSelect />}
             {seasonNavigation.showSeasonControl &&
               (seasonNavigation.isReady && seasonControlProps ? (

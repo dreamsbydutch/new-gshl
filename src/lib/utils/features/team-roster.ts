@@ -1,7 +1,8 @@
 import type { Contract, GSHLTeam, Player } from "@gshl-types";
 import { ContractStatus, RosterPosition } from "../domain/constants";
 import { CAP_CEILING } from "./contract-table";
-import { toNumber } from "../core";
+import { isPlayingContract } from "../domain/contracts";
+import { normalizeDateOnlyValue, toNumber } from "../core";
 import type {
   TeamRosterProps,
   PlayerCardProps,
@@ -51,6 +52,27 @@ export function getRosterRatingClass(seasonRk: Player["seasonRk"]) {
   return typeof seasonRk === "number" && Number.isFinite(seasonRk)
     ? getRatingColorClass(seasonRk)
     : "bg-gray-200 text-gray-700";
+}
+
+export function getContractedRosterPlayerIds(
+  contracts: readonly Contract[],
+  today: string,
+) {
+  const ids = new Set<string>();
+  for (const contract of contracts) {
+    if (
+      !isPlayingContract(contract) ||
+      contract.expiryStatus === ContractStatus.TRADE
+    )
+      continue;
+    const signed = normalizeDateOnlyValue(
+      contract.signingDate || contract.startDate,
+    );
+    const end = normalizeDateOnlyValue(contract.expiryDate);
+    if (signed && end && signed <= today && today <= end)
+      ids.add(contract.playerId);
+  }
+  return ids;
 }
 
 const RFA_SALARY_MULTIPLIER = 1.15;

@@ -13,36 +13,45 @@ export function HomeScoreboardSkeleton() {
     <section
       aria-label="Loading GSHL scoreboard"
       aria-busy="true"
-      className="mx-auto w-full max-w-5xl overflow-hidden"
+      className="mx-auto w-full max-w-none overflow-hidden"
     >
       <Skeleton className="mb-2 h-4 w-36" />
       <div className="flex gap-2 overflow-hidden">
         {[0, 1, 2, 3, 4, 5].map((item) => (
-          <Skeleton key={item} className="h-24 w-24 shrink-0 rounded-lg" />
+          <Skeleton key={item} className="h-20 w-40 shrink-0 rounded-lg" />
         ))}
       </div>
     </section>
   );
 }
 
-export function HomeScoreboard({ seasonId }: { seasonId: string }) {
+export function HomeScoreboard({
+  seasonId,
+  ownerTeamId,
+}: {
+  seasonId: string;
+  ownerTeamId?: string;
+}) {
   const { week, matchupGroups, isLoading, isScheduleLoading, error } =
-    useHomeScoreboard(seasonId);
+    useHomeScoreboard(seasonId, ownerTeamId);
   const track = useRef<HTMLUListElement>(null);
   const currentWeekStart = useRef<HTMLLIElement>(null);
+  const positionedTrack = useRef<HTMLUListElement | null>(null);
+  const hasCurrentWeek = matchupGroups.some((group) => group.isCurrentWeek);
   useEffect(() => {
     const list = track.current;
     const item = currentWeekStart.current;
-    if (isLoading || isScheduleLoading || !list || !item) return;
+    if (!list || !item || positionedTrack.current === list) return;
     list.scrollLeft +=
       item.getBoundingClientRect().left - list.getBoundingClientRect().left - 2;
-  }, [week?.id, isLoading, isScheduleLoading]);
+    positionedTrack.current = list;
+  }, [week?.id, hasCurrentWeek, isLoading, isScheduleLoading, error]);
   if (isLoading) return <HomeScoreboardSkeleton />;
 
   return (
     <section
       aria-label="GSHL matchups"
-      className="mx-auto w-full min-w-0 max-w-5xl"
+      className="mx-auto w-full min-w-0 max-w-none"
     >
       {isScheduleLoading ? (
         <p role="status" className="py-3 text-sm text-slate-500">
@@ -65,7 +74,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
             ref={track}
             aria-label="Weekly matchups"
             tabIndex={0}
-            className="flex snap-x snap-mandatory scroll-px-0.5 gap-4 overflow-x-auto overscroll-x-contain p-0.5 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:gap-6"
+            className="flex snap-x snap-mandatory scroll-px-0.5 gap-3 overflow-x-auto overscroll-x-contain p-0.5 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:gap-3"
           >
             {matchupGroups.map(
               ({
@@ -79,82 +88,110 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                 <li
                   key={matchupWeek.id}
                   ref={isCurrentWeek ? currentWeekStart : undefined}
-                  className="w-max shrink-0 border-l-2 border-slate-300 pl-4 first:border-l-0 first:pl-0 sm:pl-6"
+                  className="w-max shrink-0 border-l-2 border-slate-300 pl-3 first:border-l-0 first:pl-0"
                 >
-                  <h2 className="sticky left-0 mb-2 w-max max-w-full bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <h2 className="sticky left-0 mb-1 w-max max-w-full bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Week {matchupWeek.weekNum} ·{" "}
                     {matchupPhase === "current"
-                      ? "In progress"
+                      ? "This week"
                       : matchupPhase === "upcoming"
-                        ? "Matchup preview →"
-                        : "Week complete"}
+                        ? "Next"
+                        : "Previous"}
                   </h2>
                   <ul
                     aria-label={`Week ${matchupWeek.weekNum} matchups`}
                     className="flex gap-2"
                   >
-                    {matchups.map((matchup) => (
-                      <li key={matchup.id} className="w-28 shrink-0 snap-start">
-                        <Link
-                          href={buildMatchupNavigationHref(matchup.id, {
-                            from: "schedule",
-                            view: "week",
-                            season: seasonId,
-                            week: matchupWeek.id,
-                          })}
-                          className="block rounded-lg border border-slate-200 bg-white p-3 text-slate-900 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    {matchups.map(({ matchup, isOwn }) => {
+                      const isFinal = matchup.isComplete;
+                      const isUpcoming =
+                        !isFinal && matchupPhase === "upcoming";
+                      const status = isFinal
+                        ? "Final"
+                        : isUpcoming
+                          ? "Upcoming"
+                          : "Active";
+                      return (
+                        <li
+                          key={matchup.id}
+                          className={`w-24 shrink-0 snap-start ${isOwn ? "pb-4" : ""}`}
                         >
-                          <div className="space-y-2">
-                            {(["away", "home"] as const).map((side) => {
-                              const team = teams.find(
-                                (entry) =>
-                                  entry.id === matchup[`${side}TeamId`],
-                              );
-                              const rank = powerRankings?.entries.find(
-                                (entry) => entry.team.id === team?.id,
-                              )?.rank;
-                              const score = matchup[`${side}Score`];
-                              return (
-                                <div
-                                  key={side}
-                                  title={team?.name ?? "Team TBD"}
-                                  className="relative flex items-center"
-                                >
-                                  <div className="flex items-center gap-0.5">
-                                    <MatchupRankBadge rank={rank}>
-                                      {team?.logoUrl ? (
-                                        <Image
-                                          src={team.logoUrl}
-                                          alt=""
-                                          width={32}
-                                          height={32}
-                                          className="h-8 w-8 shrink-0 rounded bg-white object-contain"
-                                        />
-                                      ) : (
-                                        <span
-                                          aria-hidden="true"
-                                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-500"
-                                        >
-                                          {team?.name?.slice(0, 1) ?? "?"}
-                                        </span>
-                                      )}
-                                    </MatchupRankBadge>
-                                  </div>
-                                  <span className="sr-only">
-                                    {team?.name ?? "Team TBD"}
-                                  </span>
-                                  <span className="ml-auto font-oswald text-xl tabular-nums">
-                                    {matchupPhase === "upcoming"
-                                      ? "–"
-                                      : (score ?? "–")}
-                                  </span>
-                                </div>
-                              );
+                          <Link
+                            href={buildMatchupNavigationHref(matchup.id, {
+                              from: "schedule",
+                              view: "week",
+                              season: seasonId,
+                              week: matchupWeek.id,
                             })}
-                          </div>
-                        </Link>
-                      </li>
-                    ))}
+                            title={
+                              isOwn
+                                ? `Your matchup (${status})`
+                                : `${status} matchup`
+                            }
+                            className={`relative flex items-center gap-2 rounded border ${isOwn ? "border-blue-600 ring-1 ring-inset ring-blue-600" : "border-slate-200"} px-2 py-1.5 text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${!isFinal && matchupPhase === "current" ? "bg-sky-50/70 hover:bg-sky-50" : "bg-white hover:bg-slate-50"}`}
+                          >
+                            <span className="sr-only">{status}. </span>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              {(["away", "home"] as const).map((side) => {
+                                const team = teams.find(
+                                  (entry) =>
+                                    entry.id === matchup[`${side}TeamId`],
+                                );
+                                const rank = powerRankings?.entries.find(
+                                  (entry) => entry.team.id === team?.id,
+                                )?.rank;
+                                const score = matchup[`${side}Score`];
+                                return (
+                                  <div
+                                    key={side}
+                                    title={`${team?.name ?? "Team TBD"}${powerRankings?.latestWeek ? `; Rankings: Week ${powerRankings.latestWeek.weekNum}` : ""}`}
+                                    className="relative flex items-center"
+                                  >
+                                    <div className="flex items-center gap-0.5">
+                                      <MatchupRankBadge rank={rank}>
+                                        {team?.logoUrl ? (
+                                          <Image
+                                            src={team.logoUrl}
+                                            alt=""
+                                            width={28}
+                                            height={28}
+                                            className="h-7 w-7 shrink-0 rounded bg-white object-contain"
+                                          />
+                                        ) : (
+                                          <span
+                                            aria-hidden="true"
+                                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-500"
+                                          >
+                                            {team?.name?.slice(0, 1) ?? "?"}
+                                          </span>
+                                        )}
+                                      </MatchupRankBadge>
+                                    </div>
+                                    <span className="sr-only">
+                                      {team?.name ?? "Team TBD"}
+                                    </span>
+                                    <span className="ml-auto font-oswald text-lg tabular-nums">
+                                      {isUpcoming ? "–" : (score ?? "–")}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <span
+                              aria-hidden="true"
+                              className="w-2 shrink-0 text-center text-[10px] font-semibold text-slate-500"
+                            >
+                              {isFinal ? "F" : null}
+                            </span>
+                            {isOwn && (
+                              <span className="absolute inset-x-0 top-full mt-0.5 text-center text-[10px] font-semibold text-blue-700">
+                                Your matchup
+                              </span>
+                            )}
+                          </Link>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </li>
               ),

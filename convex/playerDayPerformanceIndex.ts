@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./lib/scheduling";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -43,7 +44,7 @@ export const prepare = mutation({
         indexedRows: 0,
         cursor: null,
       });
-    await ctx.scheduler.runAfter(0, internal.playerDayPerformanceIndex.batch, {
+    await scheduleAfter(ctx, 0, internal.playerDayPerformanceIndex.batch, {
       source: args.source,
       seasonId: args.seasonId,
       expectedCursor: state?.cursor ?? null,
@@ -79,10 +80,9 @@ export const batch = internalMutation({
       ready: result.isDone,
     });
     if (!result.isDone)
-      await ctx.scheduler.runAfter(
-        0,
-        internal.playerDayPerformanceIndex.batch,
-        { ...args, expectedCursor: result.continueCursor },
-      );
+      await scheduleAfter(ctx, 0, internal.playerDayPerformanceIndex.batch, {
+        ...args,
+        expectedCursor: result.continueCursor,
+      });
   },
 });

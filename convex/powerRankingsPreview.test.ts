@@ -51,3 +51,79 @@ void test("matchup ranks preserve entering snapshots and cap future weeks at cur
   assert.deepEqual(await ranks("future"), [2]);
   assert.deepEqual(await ranks("missing"), []);
 });
+
+void test("active week without a ranking snapshot uses the latest prior rankings, never future ranks", async () => {
+  const f = mutationFixture();
+  f.put("seasons", "season", { name: "Test", isActive: true });
+  f.put("teams", "team", { seasonId: "season", name: "Team" });
+  for (const [id, startDate, endDate, rank] of [
+    ["past", "2026-11-02", "2026-11-08", 7],
+    ["current", "2026-11-09", "2026-11-15", null],
+    ["future", "2026-11-16", "2026-11-22", 1],
+  ] as const) {
+    f.put("weeks", id, {
+      seasonId: "season",
+      startDate,
+      endDate,
+      weekNum: 1,
+      weekType: "RS",
+    });
+    f.put("teamWeekStatLines", id + "stat", {
+      seasonId: "season",
+      weekId: id,
+      gshlTeamId: "team",
+      powerRk: rank,
+    });
+  }
+  const result = (await invokeMutation(powerRankingsPreview, f.ctx, {
+    seasonId: "season",
+    weekId: "current",
+    referenceDate: "2026-11-15",
+    take: 8,
+  })) as { entries: { rank: number }[] };
+  assert.deepEqual(
+    result.entries.map((entry) => entry.rank),
+    [7],
+  );
+});
+
+void test("past matchup without a snapshot falls back to its nearest older ranked week", async () => {
+  const f = mutationFixture();
+  f.put("seasons", "season", { name: "Test", isActive: true });
+  f.put("teams", "team", { seasonId: "season", name: "Team" });
+  for (const [id, weekNum, startDate, endDate, rank] of [
+    ["older", 5, "2026-10-19", "2026-10-25", 8],
+    ["ranked", 6, "2026-10-26", "2026-11-01", 7],
+    ["past", 7, "2026-11-02", "2026-11-08", null],
+    ["current", 8, "2026-11-09", "2026-11-15", 2],
+    ["future", 9, "2026-11-16", "2026-11-22", 1],
+  ] as const) {
+    f.put("weeks", id, {
+      seasonId: "season",
+      startDate,
+      endDate,
+      weekNum,
+      weekType: "RS",
+    });
+    f.put("teamWeekStatLines", id + "stat", {
+      seasonId: "season",
+      weekId: id,
+      gshlTeamId: "team",
+      powerRk: rank,
+    });
+  }
+  const result = (await invokeMutation(powerRankingsPreview, f.ctx, {
+    seasonId: "season",
+    weekId: "past",
+    referenceDate: "2026-11-15",
+    take: 8,
+  })) as {
+    latestWeek: { weekNum: number } | null;
+    entries: { rank: number }[];
+  };
+  assert.deepEqual(
+    result.entries.map((entry) => entry.rank),
+    [7],
+  );
+  assert.deepEqual(result.latestWeek, { weekNum: 6 });
+});

@@ -47,7 +47,7 @@ const cachedStandings = unstable_cache(
     void refreshWindow;
     return loadNHLStandings(seasonId);
   },
-  ["nhl-standings-by-season"],
+  ["nhl-standings-by-season-v2"],
   { revalidate: NHL_STANDINGS_REFRESH_SECONDS },
 );
 

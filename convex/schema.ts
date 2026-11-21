@@ -1234,6 +1234,7 @@ export default defineSchema({
     .index("by_seasonId_weekId", ["seasonId", "weekId"])
     .index("by_seasonId_editionKey", ["seasonId", "editionKey"])
     .index("by_status_publishedAt", ["status", "publishedAt"])
+    .index("by_status", ["status"])
     .index("by_homeActive_publishedAt", ["isHomeActive", "publishedAt"])
     .index("by_seasonId_status_publishedAt", [
       "seasonId",

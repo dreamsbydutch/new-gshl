@@ -1,9 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import {
+  useAuthSession,
   useCareerSplits,
   usePlayers,
   usePlayersByIds,
@@ -13,7 +15,6 @@ import {
   useSeasonState,
   useLockerRoomTeamOptions,
   useNHLTeams,
-  useContracts,
   useNav,
   useContractData,
   useTeamAwards,
@@ -22,7 +23,6 @@ import { getOwnerTeamIds, resolveSalaryCapSeason } from "@gshl-utils";
 import { isRosterSigningWindowOpen } from "@gshl-utils/features/roster-signing-window";
 import { resolveUfaSigningSeason } from "@gshl-utils/features/ufa-deadline";
 import {
-  CapLabSkeleton,
   ContractHistorySkeleton,
   DraftPickListSkeleton,
   LockerRoomHeaderSkeleton,
@@ -42,10 +42,10 @@ const TeamRecordBook = dynamic(
     ),
   { loading: () => <TeamRecordBookSkeleton /> },
 );
-const TeamDraftPickHistory = dynamic(
+const TeamPicks = dynamic(
   () =>
-    import("@gshl-components/team/TeamDraftPickHistory").then(
-      (module) => module.TeamDraftPickHistory,
+    import("@gshl-components/team/TeamPicks").then(
+      (module) => module.TeamPicks,
     ),
   { loading: () => <DraftPickListSkeleton /> },
 );
@@ -84,13 +84,6 @@ const FranchiseContractHistory = dynamic(
     ),
   { loading: () => <ContractHistorySkeleton /> },
 );
-const InteractiveContractTable = dynamic(
-  () =>
-    import("@gshl-components/contracts/InteractiveContractTable").then(
-      (module) => module.InteractiveContractTable,
-    ),
-  { loading: () => <CapLabSkeleton /> },
-);
 
 const TradeBlock = dynamic(
   () =>
@@ -105,6 +98,7 @@ const TradeBlock = dynamic(
 );
 
 export function LockerRoomContent() {
+  const { session } = useAuthSession();
   const [capView, setCapView] = useState("contracts");
   const { selectedSeason, currentSeason, defaultSeason, seasons } =
     useSeasonState();
@@ -112,7 +106,9 @@ export function LockerRoomContent() {
   const showRosterSalaries = isRosterSigningWindowOpen(
     resolveUfaSigningSeason(seasons),
   );
-  const { selectedLockerRoomType, selectedOwnerId } = useNav();
+  const { selectedLockerRoomType: storedView, selectedOwnerId } = useNav();
+  const selectedLockerRoomType =
+    storedView === "overview" ? "roster" : storedView;
   const salaryCapSeason = useMemo(
     () => resolveSalaryCapSeason(seasons, contextSeason, defaultSeason),
     [contextSeason, defaultSeason, seasons],
@@ -131,6 +127,9 @@ export function LockerRoomContent() {
   const currentTeam = teamCatalog.teamOptions.find(
     (team) => team.ownerId === selectedOwnerId,
   );
+  const yahooTeamId = currentTeam?.ownerIsActive
+    ? currentTeam.yahooId?.trim()
+    : undefined;
   const teams = allTeams.filter(
     (team) => team.seasonId === (currentTeam?.seasonId ?? contextSeason?.id),
   );
@@ -145,34 +144,6 @@ export function LockerRoomContent() {
     ownerId: currentTeam?.ownerId,
     enabled: needsPlayers && Boolean(currentTeam?.ownerId),
   });
-  const { data: signablePlayers = [], isLoading: signablePlayersLoading } =
-    usePlayers({
-      isActive: true,
-      enabled: selectedLockerRoomType === "salary",
-    });
-  const needsCapLabData = selectedLockerRoomType === "salary";
-  const {
-    data: allLeagueContracts = [],
-    isLoading: allLeagueContractsLoading,
-  } = useContracts({ enabled: needsCapLabData });
-  const tradePlayerIds = useMemo(() => {
-    if (!currentTeam?.ownerId) return [];
-    return [
-      ...new Set(
-        allLeagueContracts
-          .filter(
-            (contract) =>
-              String(contract.ownerId ?? "") !== String(currentTeam.ownerId),
-          )
-          .map((contract) => String(contract.playerId ?? ""))
-          .filter(Boolean),
-      ),
-    ];
-  }, [allLeagueContracts, currentTeam?.ownerId]);
-  const tradePlayersQuery = usePlayersByIds(
-    tradePlayerIds,
-    needsCapLabData && tradePlayerIds.length > 0,
-  );
   const needsNhlTeams = selectedLockerRoomType === "salary" || isRecordBookTab;
   const { data: nhlTeamsRaw = [], isLoading: nhlTeamsLoading } = useNHLTeams({
     enabled: needsNhlTeams,
@@ -253,9 +224,6 @@ export function LockerRoomContent() {
     teamsLoading ||
     (needsPlayers && playersLoading) ||
     (needsContractData && contractDataLoading) ||
-    (selectedLockerRoomType === "salary" && signablePlayersLoading) ||
-    (needsCapLabData &&
-      (allLeagueContractsLoading || tradePlayersQuery.isLoading)) ||
     (needsNhlTeams && nhlTeamsLoading) ||
     (isTrophyTab && teamAwardsLoading) ||
     (isRecordBookTab &&
@@ -314,9 +282,11 @@ export function LockerRoomContent() {
   }
   return (
     <>
-      {selectedLockerRoomType !== "draft" && (
-        <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
-      )}
+      <LockerRoomHeader
+        currentTeam={currentTeam}
+        headingLevel={2}
+        yahooTeamId={yahooTeamId}
+      />
       {isInactiveOwner && (
         <p className="mb-3 text-xs text-slate-500">
           <span className="font-semibold">Inactive owner</span>
@@ -333,7 +303,6 @@ export function LockerRoomContent() {
             {(
               [
                 ["contracts", "Contracts"],
-                ["planner", "Planner"],
                 ["history", "History"],
               ] as const
             ).map(([key, label]) => (
@@ -342,7 +311,7 @@ export function LockerRoomContent() {
                 type="button"
                 aria-pressed={capView === key}
                 onClick={() => setCapView(key)}
-                className={`min-h-9 border-b-2 px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${capView === key ? "border-slate-950 font-semibold text-slate-950" : "border-transparent text-slate-500"}`}
+                className={`min-h-11 border-b-2 px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${capView === key ? "border-slate-950 font-semibold text-slate-950" : "border-transparent text-slate-500"}`}
               >
                 {label}
               </button>
@@ -360,28 +329,25 @@ export function LockerRoomContent() {
               }}
             />
           </div>
-          <div hidden={capView !== "planner"}>
-            <InteractiveContractTable
-              currentSeason={contractSeason}
-              currentTeam={currentTeam}
-              signablePlayers={signablePlayers}
-              tradePlayers={tradePlayersQuery.data}
-              tradeContracts={allLeagueContracts}
-              contractPlayers={contractPlayers}
-              nhlTeams={nhlTeams}
-              existingContracts={currentContracts}
-              seasons={seasons ?? []}
-              ready={teamContractTableData.ready}
-            />
-          </div>
           <div hidden={capView !== "history"}>
             <FranchiseContractHistory {...teamContractHistory} />
           </div>
         </>
       )}
-      {selectedLockerRoomType === "tradeBlock" && (
-        <TradeBlock key={currentTeam.ownerId} currentTeam={currentTeam} />
-      )}
+      {selectedLockerRoomType === "tradeBlock" &&
+        (session?.user.status === "active" ? (
+          <TradeBlock key={currentTeam.ownerId} currentTeam={currentTeam} />
+        ) : (
+          <p className="py-6 text-sm text-slate-500">
+            Sign in to explore the trade market.{" "}
+            <Link
+              className="underline"
+              href="/signin?callbackUrl=%2Flockerroom%3Fview%3DtradeBlock"
+            >
+              Sign in
+            </Link>
+          </p>
+        ))}
       {selectedLockerRoomType === "roster" && (
         <TeamRoster
           {...{
@@ -389,6 +355,7 @@ export function LockerRoomContent() {
             contracts: currentContracts,
             currentTeam,
             showSalaries: showRosterSalaries,
+            showContractIcons: true,
           }}
         />
       )}
@@ -401,9 +368,10 @@ export function LockerRoomContent() {
         />
       )}
       {selectedLockerRoomType === "draft" && (
-        <TeamDraftPickHistory
+        <TeamPicks
           key={currentTeam.ownerId}
-          currentTeam={currentTeam}
+          team={currentTeam}
+          teams={allTeams}
           seasons={seasons}
         />
       )}

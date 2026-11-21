@@ -47,6 +47,7 @@ export interface UseTeamScheduleSummaryOptions {
 }
 
 export interface TeamScheduleStatsPayload {
+  updatedAt?: { home: number | null; away: number | null };
   home: MatchupTeamWeekStats | null;
   away: MatchupTeamWeekStats | null;
 }

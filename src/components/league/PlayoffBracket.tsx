@@ -38,7 +38,7 @@ function TeamSlot({
         {label}
       </span>
       <div className="flex min-w-0 items-center lg:flex-1 lg:gap-2">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center">
           {team?.logoUrl ? (
             <Image
               src={team.logoUrl}
@@ -149,13 +149,13 @@ function MatchupCard({
         <Image
           src={matchup.logoUrl}
           alt={matchup.title}
-          width={72}
-          height={72}
+          width={56}
+          height={56}
           className={cn(
-            "absolute left-1/2 h-[72px] w-[72px] -translate-x-1/2 object-contain",
+            "absolute left-1/2 h-14 w-14 -translate-x-1/2 object-contain mix-blend-multiply",
             conferenceLogoPlacement === "above"
-              ? "bottom-full"
-              : "top-full",
+              ? "bottom-full mb-2"
+              : "top-full mt-2",
           )}
         />
       ) : null}
@@ -267,7 +267,7 @@ export function PlayoffBracket({
 
   if (!season) {
     return (
-      <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">
+      <div className="border-b py-3 text-sm text-slate-500">
         Select a season to view the playoff bracket.
       </div>
     );
@@ -280,7 +280,7 @@ export function PlayoffBracket({
           role="region"
           aria-label="Playoff bracket, scroll horizontally to see all rounds"
           tabIndex={0}
-          className="overflow-x-auto rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5"
+          className="overflow-x-auto border-b border-slate-200 bg-white py-2"
         >
           <div className="grid auto-cols-[minmax(148px,1fr)] grid-flow-col gap-5 lg:auto-cols-[minmax(280px,1fr)] lg:gap-10">
             {bracket.columns.map((column, index) => (

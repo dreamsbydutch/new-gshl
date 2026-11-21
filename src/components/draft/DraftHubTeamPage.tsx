@@ -13,15 +13,15 @@ export function DraftHubTeamPage({ mode }: DraftHubTeamPageProps) {
   if (data.isLoading) return <LockerRoomSkeleton />;
   if (!data.season) {
     return (
-      <main className="container mx-auto px-3 py-8 text-center text-muted-foreground">
+      <main className="gshl-page text-sm text-muted-foreground">
         No configured draft season is available.
       </main>
     );
   }
   if (!data.selectedTeam) {
     return (
-      <main className="container mx-auto px-3 py-8">
-        <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+      <main className="gshl-page">
+        <div className="border-b py-3 text-sm text-muted-foreground">
           {mode === "my-team"
             ? "This account is not linked to a team for the draft season."
             : "Select a team from the team bar to view its draft room."}
@@ -31,9 +31,9 @@ export function DraftHubTeamPage({ mode }: DraftHubTeamPageProps) {
   }
 
   return (
-    <main className="container mx-auto space-y-4 px-3 py-4 sm:px-4">
+    <main className="gshl-page space-y-3">
       <LockerRoomHeader currentTeam={data.selectedTeam} />
-      <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+      <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
         <section
           aria-label="Current roster"
           className="order-1 min-w-0 lg:order-2 lg:col-start-1 lg:row-start-2"

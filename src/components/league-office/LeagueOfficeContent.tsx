@@ -8,7 +8,7 @@ import {
   FreeAgencySkeleton,
   OwnerRankingsSkeleton,
 } from "@gshl-skeletons";
-import { cn, resolveLeagueOfficeView } from "@gshl-utils";
+import { resolveLeagueOfficeView } from "@gshl-utils";
 
 const ConferenceContest = dynamic(
   () =>
@@ -39,15 +39,9 @@ const UfaLeagueOffice = dynamic(
 export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
   const activeType = resolveLeagueOfficeView(selectedType);
-  const usesCompactLayout = activeType === "draft";
 
   return (
-    <div
-      className={cn(
-        "container mx-auto px-4",
-        usesCompactLayout ? "py-4" : "py-8",
-      )}
-    >
+    <div className="gshl-page">
       {activeType === "draft" ? <DraftClasses /> : null}
       {activeType === "confBattle" ? <ConferenceContest /> : null}
       {activeType === "ownerRankings" ? <OwnerRankings /> : null}

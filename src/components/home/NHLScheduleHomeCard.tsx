@@ -11,25 +11,19 @@ export function NHLScheduleHomeCard() {
   if (!schedule.selectedDay) return <NHLScheduleHomeCardSkeleton />;
 
   return (
-    <section
-      aria-labelledby="nhl-home-heading"
-      className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
-    >
-      <header className="border-b border-slate-100 px-3 py-3 sm:px-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">
-          Around the NHL
-        </p>
-        <h2
-          id="nhl-home-heading"
-          className="mt-0.5 font-oswald text-lg text-slate-950 sm:text-xl"
-        >
-          Scores &amp; schedule
+    <section aria-labelledby="nhl-home-heading" className="gshl-section">
+      <header className="border-b border-slate-200 py-1">
+        <h2 id="nhl-home-heading" className="gshl-section-title">
+          NHL scores{" "}
+          <span
+            className="text-xs font-normal text-slate-500"
+            title="Eastern Time"
+          >
+            ET
+          </span>
         </h2>
-        <p className="mt-0.5 text-xs text-slate-500">
-          All times Eastern · Updates every 15 minutes
-        </p>
         <div
-          className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1"
+          className="mx-auto mt-1 grid max-w-sm grid-cols-3 gap-1"
           role="group"
           aria-label="NHL schedule day"
         >
@@ -46,7 +40,7 @@ export function NHLScheduleHomeCard() {
           ))}
         </div>
       </header>
-      <div className="px-3 py-2 sm:px-5">
+      <div className="mx-auto max-w-sm py-1">
         <h3 className="py-2 text-xs font-semibold text-slate-600">
           <time dateTime={schedule.selectedDay.date}>
             {schedule.selectedDay.dateLabel}
@@ -76,7 +70,7 @@ export function NHLScheduleHomeCard() {
           </p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {schedule.games.map((game) => {
+            {schedule.games.slice(0, 5).map((game) => {
               const hasScore = ["LIVE", "CRIT", "FINAL", "OFF"].includes(
                 game.gameState,
               );
@@ -91,7 +85,7 @@ export function NHLScheduleHomeCard() {
                     href={`/nhl/matchup/${game.id}`}
                     prefetch={false}
                     aria-label={`${awayName} at ${homeName}${hasScore ? `, ${away.score ?? "–"} to ${home.score ?? "–"}` : ""}. ${status}. View matchup.`}
-                    className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    className="flex min-h-11 flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   >
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                       <NHLLogo
@@ -121,7 +115,7 @@ export function NHLScheduleHomeCard() {
                       <span>{home.abbrev}</span>
                     </span>
                     <span
-                      className={`ml-auto whitespace-nowrap text-xs ${["LIVE", "CRIT"].includes(game.gameState) ? "font-semibold text-emerald-700" : "text-slate-500"}`}
+                      className={`whitespace-nowrap text-xs ${["LIVE", "CRIT"].includes(game.gameState) ? "font-semibold text-emerald-700" : "text-slate-500"}`}
                     >
                       {status}
                     </span>
@@ -133,7 +127,7 @@ export function NHLScheduleHomeCard() {
         )}
       </div>
       {schedule.data && (
-        <p className="border-t border-slate-100 px-3 py-3 text-xs text-slate-500 sm:px-5">
+        <p className="border-t border-slate-100 py-2 text-center text-xs text-slate-500">
           Updated{" "}
           <time dateTime={new Date(schedule.data.updatedAt).toISOString()}>
             {formatNHLUpdatedAt(schedule.data.updatedAt)}

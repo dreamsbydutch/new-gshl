@@ -29,9 +29,13 @@ export function usePerformanceExplorer() {
   const [submittedFilters, setSubmittedFilters] =
     useState<PerformanceFilters | null>(null);
   const isDaily = kind.endsWith("Day");
-  const hasSeasonType = ["playerSplit", "playerTotal", "teamSeason"].includes(
-    kind,
-  );
+  const hasSeasonType = [
+    "playerSplit",
+    "playerTotal",
+    "teamSeason",
+    "playerCareer",
+    "teamCareer",
+  ].includes(kind);
   const isPlayer = kind.startsWith("player");
   const defaultSeasonId = seasons.selectedSeason?.id;
   const seasonIds = useMemo(

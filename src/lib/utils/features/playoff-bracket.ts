@@ -668,3 +668,27 @@ export function buildPlayoffBracket(
     columns,
   };
 }
+
+/** Order first-round games so adjacent cards feed the same semifinal. */
+export function buildPlayoffBracketPreview(
+  teams: SeededTeam[],
+  stats: TeamSeasonStatLine[],
+  matchups: Matchup[],
+  season: Season,
+): PlayoffBracketViewModel {
+  const bracket = buildPlayoffBracket(teams, stats, matchups, season);
+  if (bracket.format !== "league") return bracket;
+  return {
+    ...bracket,
+    columns: bracket.columns.map((column, index) =>
+      index === 0
+        ? {
+            ...column,
+            matchups: [0, 3, 1, 2].flatMap(
+              (position) => column.matchups[position] ?? [],
+            ),
+          }
+        : column,
+    ),
+  };
+}

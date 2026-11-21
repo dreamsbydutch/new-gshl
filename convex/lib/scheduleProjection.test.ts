@@ -6,7 +6,7 @@ import {
   projectWeeklyScheduleTeam,
 } from "./scheduleProjection";
 
-test("in-progress matchups replace stored score snapshots with current category scores", () => {
+void test("in-progress matchups replace stored score snapshots with current category scores", () => {
   const [matchup] = projectWeeklyScheduleMatchups(
     [
       {
@@ -32,7 +32,7 @@ test("in-progress matchups replace stored score snapshots with current category 
   assert.equal(matchup?.awayScore, 1);
 });
 
-test("weekly schedule projection sorts by rating without exposing sort metadata", () => {
+void test("weekly schedule projection sorts by rating without exposing sort metadata", () => {
   const rows = [
     {
       _id: "matchup-low",
@@ -62,6 +62,7 @@ test("weekly schedule projection sorts by rating without exposing sort metadata"
   assert.deepEqual(projectWeeklyScheduleMatchups(rows), [
     {
       id: "matchup-high",
+      isComplete: true,
       homeTeamId: "team-3",
       awayTeamId: "team-4",
       gameType: "NC",
@@ -74,6 +75,7 @@ test("weekly schedule projection sorts by rating without exposing sort metadata"
     },
     {
       id: "matchup-low",
+      isComplete: false,
       homeTeamId: "team-1",
       awayTeamId: "team-2",
       gameType: "RS",
@@ -88,7 +90,7 @@ test("weekly schedule projection sorts by rating without exposing sort metadata"
   assert.equal(rows[0]?._id, "matchup-low");
 });
 
-test("live score fallback preserves final scores and leaves future matchups unscored", () => {
+void test("live score fallback preserves final scores and leaves future matchups unscored", () => {
   const row = {
     _id: "game",
     homeTeamId: "home",
@@ -113,7 +115,7 @@ test("live score fallback preserves final scores and leaves future matchups unsc
   assert.equal(final?.awayScore, 7);
 });
 
-test("weekly schedule team projection excludes owner and unrelated team data", () => {
+void test("weekly schedule team projection excludes owner and unrelated team data", () => {
   const team = {
     _id: "team-1",
     ownerEmail: "private@example.com",
@@ -137,7 +139,7 @@ test("weekly schedule team projection excludes owner and unrelated team data", (
   });
 });
 
-test("weekly schedule projection preserves the playoff home-ice tiebreaker", () => {
+void test("weekly schedule projection preserves the playoff home-ice tiebreaker", () => {
   const [matchup] = projectWeeklyScheduleMatchups([
     {
       _id: "playoff-matchup",
@@ -156,5 +158,31 @@ test("weekly schedule projection preserves the playoff home-ice tiebreaker", () 
   assert.equal(matchup?.homeWin, true);
   assert.equal(matchup?.awayWin, false);
   assert.equal("tie" in (matchup ?? {}), false);
-  assert.equal("isComplete" in (matchup ?? {}), false);
+  assert.equal(matchup?.isComplete, true);
+});
+
+void test("completion includes recorded wins and ties but not unfinished score snapshots", () => {
+  const base = {
+    _id: "game",
+    homeTeamId: "home",
+    awayTeamId: "away",
+    gameType: "RS",
+    homeScore: 4,
+    awayScore: 4,
+  };
+  for (const finalState of [
+    { isComplete: true },
+    { homeWin: true },
+    { awayWin: true },
+    { tie: true },
+  ]) {
+    const [matchup] = projectWeeklyScheduleMatchups([
+      { ...base, ...finalState },
+    ]);
+    assert.equal(matchup?.isComplete, true);
+  }
+  const [unfinished] = projectWeeklyScheduleMatchups([
+    { ...base, isComplete: false, homeWin: false, awayWin: false, tie: false },
+  ]);
+  assert.equal(unfinished?.isComplete, false);
 });

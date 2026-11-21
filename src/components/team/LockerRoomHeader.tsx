@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import type {
   LockerRoomHeaderProps,
@@ -16,13 +17,13 @@ const TeamLogo = ({ currentTeam }: TeamLogoProps) => {
     <Image
       src={currentTeam.logoUrl}
       alt={`${currentTeam.name} logo`}
-      className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16"
+      className="h-9 w-9 shrink-0 object-contain sm:h-11 sm:w-11"
       width={TEAM_LOGO_SIZE.width}
       height={TEAM_LOGO_SIZE.height}
       onError={() => setErrored(true)}
     />
   ) : (
-    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-slate-100 sm:h-16 sm:w-16">
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 sm:h-11 sm:w-11">
       <span className="text-xs font-medium text-gray-400">No Logo</span>
     </div>
   );
@@ -37,7 +38,7 @@ const TeamInfo = ({
 
   return (
     <div className="flex min-w-0 flex-col">
-      <Heading className="break-words text-lg font-bold leading-tight text-slate-950 sm:text-2xl">
+      <Heading className="break-words text-base font-bold leading-tight text-slate-950 sm:text-lg">
         {currentTeam.name}
       </Heading>
       <span className="mt-1 text-xs text-slate-500 sm:text-sm">
@@ -55,15 +56,35 @@ const TeamInfo = ({
 export function LockerRoomHeader({
   currentTeam,
   headingLevel,
+  yahooTeamId,
 }: LockerRoomHeaderProps) {
   return (
-    <header className="mb-3 flex items-center gap-3 border-b border-slate-200 pb-3 pt-1">
+    <header className="mb-2 flex items-center gap-2 border-b border-slate-200 py-2">
       <TeamLogo currentTeam={currentTeam} />
       <TeamInfo
         currentTeam={currentTeam}
         formattedOwnerName={formatOwnerName(currentTeam)}
         headingLevel={headingLevel}
       />
+      {yahooTeamId && (
+        <a
+          href={`https://hockey.fantasysports.yahoo.com/hockey/44541/${encodeURIComponent(yahooTeamId)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Manage lineup on Yahoo (opens in a new tab)"
+          title="Manage lineup on Yahoo (opens in a new tab)"
+          className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded px-1 text-slate-600 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-500"
+        >
+          <Image
+            src="/yahoo-fantasy.png"
+            alt=""
+            width={96}
+            height={32}
+            className="h-auto w-20 sm:w-24"
+          />
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
+      )}
     </header>
   );
 }

@@ -726,14 +726,20 @@ export const powerRankingsPreview = query({
       : null;
     if (args.weekId && !requestedWeek) return null;
     const today = args.referenceDate ?? utcTimestampToDateKey(Date.now());
+    // Completed weeks use their own snapshot or the nearest older one.
+    // Active/upcoming matchups use the latest rankings saved through today.
     const historicalWeek =
-      requestedWeek && utcTimestampToDateKey(requestedWeek.startDate) <= today
+      requestedWeek &&
+      utcTimestampToDateKey(requestedWeek.startDate) <= today &&
+      (!requestedWeek.endDate ||
+        utcTimestampToDateKey(requestedWeek.endDate) < today)
         ? requestedWeek
         : null;
     const eligibleWeeks = args.weekId
       ? weeks.filter((week) =>
           historicalWeek
-            ? week._id === historicalWeek._id
+            ? utcTimestampToDateKey(week.startDate) <=
+              utcTimestampToDateKey(historicalWeek.startDate)
             : utcTimestampToDateKey(week.startDate) <= today,
         )
       : weeks;
@@ -1278,34 +1284,60 @@ export const lineupShame = query({
   handler: (ctx, args) => loadLineupShame(ctx, args.seasonId, args.recentDate),
 });
 
+export const activityArchiveInfo = query({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, {seasonId}) => {
+    const archive = await ctx.db.query("seasonDataArchives")
+      .withIndex("by_seasonId", q => q.eq("seasonId", seasonId)).first();
+    if (archive?.status !== "archived") return null;
+    const dates = archive.activitySnapshot.map((e: { date: string }) => e.date).sort();
+    return { firstDate: dates[0] ?? null, lastDate: dates.at(-1) ?? null } as { firstDate: string | null; lastDate: string | null };
+  },
+});
+
 export const activity = query({
   args: {
     seasonId: v.id("seasons"),
     take: v.number(),
+    window: v.optional(v.object({ end: v.string(), days: v.union(v.literal(1), v.literal(7)) })),
     grouped: v.optional(v.boolean()),
+    completeTeamDays: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const window = args.window;
+    let from = "";
+    if (window) {
+      const end = new Date(window.end + "T12:00:00Z");
+      if (!Number.isFinite(end.getTime()) || end.toISOString().slice(0, 10) !== window.end)
+        throw Error("Invalid activity date");
+      end.setUTCDate(end.getUTCDate() - window.days + 1);
+      from = end.toISOString().slice(0, 10);
+    }
+    const inWindow = (event: {date: string; type: string}) =>
+      event.type !== "missed_start" && event.date >= from && event.date <= window.end;
     const archived = await ctx.db
       .query("seasonDataArchives")
       .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
       .first();
     if (archived?.status === "archived") {
+      if (window) return archived.activitySnapshot.filter(inWindow) as ReturnType<typeof buildLeagueActivity>;
       return limitLeagueActivity(
         archived.activitySnapshot,
         Math.min(Math.max(args.take, 1), 30),
         args.grouped === true,
+        args.completeTeamDays === true,
       ) as ReturnType<typeof buildLeagueActivity>;
     }
     const weeks = await rows(ctx, "weeks", { where: { seasonId: args.seasonId } });
-    const latestDay = await ctx.db
+    const latestDay = window ? null : await ctx.db
       .query("playerDayStatLines")
       .withIndex("by_seasonId_date", (q) => q.eq("seasonId", args.seasonId))
       .order("desc")
       .first();
-    const latestDate = latestDay?.date ?? "";
+    const latestDate = window?.end ?? latestDay?.date ?? "";
     const lookback = latestDate ? new Date(`${latestDate}T12:00:00Z`) : null;
     lookback?.setUTCDate(lookback.getUTCDate() - 7);
-    const lookbackDate = lookback?.toISOString().slice(0, 10) ?? "";
+    const lookbackDate = window ? from : (lookback?.toISOString().slice(0, 10) ?? "");
     // Read the complete league week, plus a preceding roster for drop detection.
     const coveredWeekStarts = weeks.flatMap((week) => {
       const from = utcTimestampToDateKey(week.startDate);
@@ -1324,7 +1356,10 @@ export const activity = query({
         .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
         .collect()
         .then((rows: Row[]) =>
-          rows
+          window ? rows.filter(row => {
+            const date = utcTimestampToDateKey(row.signingDate);
+            return date && date >= from && date <= window.end;
+          }) : rows
             .sort(
               (left, right) =>
                 (toUtcTimestamp(right.signingDate) ?? 0) -
@@ -1346,7 +1381,7 @@ export const activity = query({
         .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
         .collect(),
       ctx.db.query("franchises").collect(),
-      ctx.db.query("trades").withIndex("by_seasonId_effectiveDate", q=>q.eq("seasonId",args.seasonId)).order("desc").take(30),
+      window ? ctx.db.query("trades").withIndex("by_seasonId_effectiveDate", q => q.eq("seasonId", args.seasonId).lte("effectiveDate", window.end)).collect() : ctx.db.query("trades").withIndex("by_seasonId_effectiveDate", q=>q.eq("seasonId",args.seasonId)).order("desc").take(30),
     ]);
     if (playerDays.length === 8001)
       throw Error("Activity exceeds its supported date scope");
@@ -1359,7 +1394,7 @@ export const activity = query({
       )
     ).filter((row) => row !== null);
 
-    return buildLeagueActivity({
+    const activityEvents = buildLeagueActivity({
       contracts: contracts.map((row) =>
         publicRow(row as unknown as Row),
       ) as never,
@@ -1371,12 +1406,14 @@ export const activity = query({
       franchises: franchises.map((row) =>
         publicRow(row as unknown as Row),
       ) as never,
-      limit: Math.min(Math.max(args.take, 1), 30),
+      limit: window ? Infinity : Math.min(Math.max(args.take, 1), 30),
       weeks,
       perTypeLimit: args.grouped === true,
+      completeTeamDays: args.completeTeamDays === true,
       rosterStartDate: start,
       trades: trades.map(projectTrade),
     });
+    return window ? activityEvents.filter(inWindow) : activityEvents;
   },
 });
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePowerRankingsPreview } from "../main/usePowerRankings";
 import { useWeeks, useWeeklyScheduleSummary } from "../main";
+import { orderHomeMatchups } from "@gshl-utils/features/home-dashboard";
 import { selectWeekForReferenceDate } from "@gshl-utils/domain/schedule";
 import {
   normalizeDateOnlyValue,
@@ -10,7 +11,7 @@ import {
 } from "@gshl-utils/core/date";
 
 /** Home follows today's week, independently of the schedule's saved selection. */
-export function useHomeScoreboard(seasonId: string) {
+export function useHomeScoreboard(seasonId: string, ownerTeamId?: string) {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
     const refresh = () => setNow(new Date());
@@ -44,17 +45,17 @@ export function useHomeScoreboard(seasonId: string) {
   });
   const previousPower = usePowerRankingsPreview(
     previousWeek ? seasonId : undefined,
-    8,
+    16,
     previousWeek?.id,
   );
   const currentPower = usePowerRankingsPreview(
     week ? seasonId : undefined,
-    8,
+    16,
     week?.id,
   );
   const nextPower = usePowerRankingsPreview(
     nextWeek ? seasonId : undefined,
-    8,
+    16,
     nextWeek?.id,
   );
   const today = now ? toLocalIsoDateOnly(now) : "";
@@ -99,7 +100,11 @@ export function useHomeScoreboard(seasonId: string) {
       return [
         {
           powerRankings,
-          matchups: data.matchups,
+          matchups: orderHomeMatchups(
+            data.matchups,
+            powerRankings?.entries ?? [],
+            ownerTeamId,
+          ),
           week: matchupWeek,
           teams: data.teams,
           phase: matchupPhase,

@@ -13,13 +13,16 @@ export function mutationFixture() {
   const scheduled: { delay: number; args: Record<string, unknown> }[] = [];
   let subject: string | null = "commissioner";
   let nextId = 0;
+  let creationTime = 0;
   const table = (name: string) => {
     if (!tables.has(name)) tables.set(name, new Map());
     return tables.get(name)!;
   };
   const rows = (name: string) => [...table(name).values()];
   const put = (name: string, id: string, value: Record<string, unknown>) => {
-    table(name).set(id, { ...value, _id: id, _creationTime: 1 });
+    const entries = table(name);
+    const created = entries.get(id)?._creationTime ?? ++creationTime;
+    entries.set(id, { ...value, _id: id, _creationTime: created });
   };
   const get = (id: string) => {
     for (const entries of tables.values()) {
@@ -53,7 +56,7 @@ export function mutationFixture() {
                 if (left === right) continue;
                 return (String(left) < String(right) ? -1 : 1) * direction;
               }
-              return 0;
+              return (a._creationTime - b._creationTime) * direction;
             });
         const query = {
           withIndex: (

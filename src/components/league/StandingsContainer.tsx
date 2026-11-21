@@ -230,9 +230,9 @@ function StandingsGroupTable({
                             currentTeamId === team.id ? null : team.id,
                           )
                         }
-                        className="flex w-full min-w-0 items-center gap-1.5 rounded-lg px-0.5 py-1 text-left outline-none transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 sm:gap-2.5 sm:px-1"
+                        className="flex w-full min-w-0 items-center gap-1.5 rounded-lg bg-transparent px-0.5 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 sm:gap-2.5 sm:px-1"
                       >
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 sm:h-8 sm:w-8">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center sm:h-8 sm:w-8">
                           {team.logoUrl ? (
                             <Image
                               src={team.logoUrl}

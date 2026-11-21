@@ -18,6 +18,8 @@ export const PERFORMANCE_KINDS: { value: PerformanceKind; label: string }[] = [
   { value: "teamDay", label: "Team days" },
   { value: "teamWeek", label: "Team weeks" },
   { value: "teamSeason", label: "Team seasons" },
+  { value: "playerCareer", label: "Player careers" },
+  { value: "teamCareer", label: "Franchise careers" },
 ];
 const hockeyStats = [
   "GP",
@@ -63,6 +65,14 @@ const goalieStats = new Set([
   "RBS",
 ]);
 export function performanceStats(kind: PerformanceKind): string[] {
+  if (kind === "playerCareer") return hockeyStats;
+  if (kind === "teamCareer")
+    return [
+      ...hockeyStats.filter((stat) => stat !== "GAA" && stat !== "SVP"),
+      "teamW",
+      "teamL",
+      "teamT",
+    ];
   if (kind === "playerNhl")
     return [
       "seasonRating",
@@ -189,9 +199,15 @@ export function performanceDisplayStats(
   const stats = Object.fromEntries(
     performanceStats(kind).map((stat) => [stat, performanceNumber(row[stat])]),
   );
-  if (kind !== "playerNhl") {
+  // Career records aggregate native season totals; period ratings cannot be
+  // summed into a career rating, so those record projections omit ratings.
+  if (
+    kind !== "playerNhl" &&
+    kind !== "playerCareer" &&
+    kind !== "teamCareer"
+  ) {
     const periods: Record<
-      Exclude<PerformanceKind, "playerNhl">,
+      Exclude<PerformanceKind, "playerNhl" | "playerCareer" | "teamCareer">,
       GshlRatingPeriod
     > = {
       playerDay: "playerDayStatLines",
@@ -231,7 +247,8 @@ export function qualifiesForPerformance(
   ].includes(filters.stat);
   // Empty/non-playing rows must not win rate-stat or shutout leaderboards.
   return (
-    (availabilityStat || (performanceNumber(row.GP) ?? 0) > 0) &&
+    (availabilityStat ||
+      (performanceNumber(row.GP) ?? 0) >= (filters.minimumGames ?? 1)) &&
     performanceNumber(row[filters.stat]) !== null
   );
 }

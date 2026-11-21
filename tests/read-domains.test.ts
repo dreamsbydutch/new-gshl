@@ -297,6 +297,16 @@ void test("activity preview requests six per type and expands only on demand", (
   });
 });
 
+void test("Home requests complete team days without changing the activity page contract", (t) => {
+  const h = mount(t, () => useLeagueActivity("season", 30, true));
+  assert.deepEqual(h.transport.mock.calls.at(-1)?.arguments[1], {
+    seasonId: "season",
+    take: 30,
+    grouped: true,
+    completeTeamDays: true,
+  });
+});
+
 void test("activity expansion keeps its preview mounted and never carries it into another season", (t) => {
   let take = 6;
   let seasonId = "first";

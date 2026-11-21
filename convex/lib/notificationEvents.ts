@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./scheduling";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
@@ -46,7 +47,7 @@ export async function emitNotification(
     ...event,
     createdAt: Date.now(),
   });
-  await ctx.scheduler.runAfter(0, internal.notifications.fanOut, {
+  await scheduleAfter(ctx, 0, internal.notifications.fanOut, {
     eventId,
     cursor: null,
   });

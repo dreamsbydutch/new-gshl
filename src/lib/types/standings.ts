@@ -32,6 +32,7 @@ export interface StandingsCategoryRank {
   value: number | string | null | undefined;
   rank: number | null;
   isTied?: boolean;
+  isLast?: boolean;
 }
 
 export interface StandingsTeamGameContext {

@@ -11,7 +11,125 @@ import {
   selectHomePowerRankingPreview,
   selectHomeUfaPreview,
   isHomeDraftHubVisible,
+  prioritizeHomeActivity,
+  orderHomeMatchups,
 } from "./home-dashboard";
+import type { LeagueActivityEvent } from "../../types/league-activity";
+import { limitLeagueActivity } from "./league-activity";
+
+void test("complete Home groups retain an owner trade behind a busy signing feed", () => {
+  const events: LeagueActivityEvent[] = Array.from({ length: 30 }, (_, i) => ({
+    id: `sign-${i}`,
+    type: "signing",
+    date: "2026-11-15",
+    teamId: "other",
+    teamName: "Other",
+    teamLogoUrl: null,
+    teamAbbr: null,
+    playerId: `p${i}`,
+    playerName: `Player ${i}`,
+  }));
+  events.push({
+    ...events[0]!,
+    id: "owner-trade",
+    type: "trade",
+    date: "2026-11-14",
+    teamId: "own",
+  });
+  const candidates = limitLeagueActivity(events, 30, true, true);
+  assert.equal(candidates.length, 31);
+  assert.equal(
+    prioritizeHomeActivity(candidates, "own")[0]?.events[0]?.id,
+    "owner-trade",
+  );
+});
+
+void test("the rundown prioritizes your team, opponent and contenders without mutating league activity", () => {
+  const events: LeagueActivityEvent[] = [
+    "league",
+    "opponent",
+    "own",
+    "contender",
+  ].map((teamId, index) => ({
+    id: String(index),
+    type: "add",
+    date: "2026-11-15",
+    playerId: "player",
+    playerName: "Player",
+    teamId,
+    teamName: teamId,
+    teamAbbr: null,
+    teamLogoUrl: null,
+  }));
+  const before = structuredClone(events);
+  assert.deepEqual(
+    prioritizeHomeActivity(events, "own", "opponent", ["contender"]).map(
+      (event) => event.teamId,
+    ),
+    ["own", "opponent", "contender", "league"],
+  );
+  assert.deepEqual(events, before);
+  assert.deepEqual(
+    prioritizeHomeActivity(events).flatMap((group) =>
+      group.events.map((event) => event.id),
+    ),
+    ["0", "1", "2", "3"],
+  );
+});
+
+void test("Home includes every team-day group and every move", () => {
+  const events: LeagueActivityEvent[] = Array.from({ length: 9 }, (_, i) => ({
+    id: `move-${i}`,
+    type: i < 5 ? "add" : "drop",
+    date: "2026-11-15",
+    playerId: `p${i}`,
+    playerName: `Player ${i}`,
+    teamId: "own",
+    teamName: "Owner",
+    teamAbbr: null,
+    teamLogoUrl: null,
+  }));
+  events.push(
+    ...Array.from({ length: 7 }, (_, i) => ({
+      ...events[0]!,
+      id: `other-${i}`,
+      teamId: `other-${i}`,
+    })),
+  );
+  const before = structuredClone(events);
+  const groups = prioritizeHomeActivity(events, "own");
+  assert.equal(groups.length, 8);
+  assert.equal(groups[0]?.events.length, 9);
+  assert.equal(
+    groups[0]?.events.filter((event) => event.type === "drop").length,
+    4,
+  );
+  assert.deepEqual(events, before);
+});
+
+void test("weekly matchup order prioritizes either owner side and then combined rating", () => {
+  const games = Object.freeze([
+    { homeTeamId: "a", awayTeamId: "b" },
+    { homeTeamId: "c", awayTeamId: "d" },
+    { homeTeamId: "e", awayTeamId: "f" },
+    { homeTeamId: "g", awayTeamId: "h" },
+  ]);
+  const entries = [100, null, 30, 50, 55, 45, 60, 20].map((rating, i) => ({
+    team: { id: "abcdefgh".charAt(i) },
+    rating,
+  }));
+  const ordered = (teamId?: string) =>
+    orderHomeMatchups(games, entries, teamId).map(
+      ({ matchup }) => matchup.homeTeamId,
+    );
+  assert.deepEqual(ordered(), ["e", "c", "g", "a"]);
+  assert.deepEqual(ordered("b"), ["a", "e", "c", "g"]);
+  assert.deepEqual(ordered("g"), ["g", "e", "c", "a"]);
+  assert.deepEqual(
+    orderHomeMatchups(games, [], "h").map((entry) => entry.isOwn),
+    [true, false, false, false],
+  );
+});
 
 void test("home draft hub appears one week before the draft and hides three days after", () => {
   const startsAt = "2026-10-04T23:00:00Z";

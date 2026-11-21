@@ -274,23 +274,24 @@ function buildCategoryRanks(
     if (selectedValue === null) return [];
 
     // Equal totals share a rank; missing values never outrank valid stats.
-    const rank =
-      1 +
-      teamStats.filter((row) => {
-        const candidate = numeric(row[key]);
-        return (
-          candidate !== null &&
-          (direction === "asc"
-            ? candidate < selectedValue
-            : candidate > selectedValue)
-        );
-      }).length;
-    const isTied = teamStats.some(
-      (row) =>
-        String(row.gshlTeamId) !== teamId &&
-        numeric(row[key]) === selectedValue,
-    );
-    return [{ label, value, rank, isTied }];
+    let rank = 1;
+    let isTied = false;
+    let hasLowerRankedTeam = false;
+    for (const row of teamStats) {
+      if (String(row.gshlTeamId) === teamId) continue;
+      const candidate = numeric(row[key]);
+      if (candidate === null) continue;
+      if (candidate === selectedValue) isTied = true;
+      else if (
+        direction === "asc"
+          ? candidate < selectedValue
+          : candidate > selectedValue
+      )
+        rank++;
+      else hasLowerRankedTeam = true;
+    }
+    const isLast = rank > 1 && !hasLowerRankedTeam;
+    return [{ label, value, rank, isTied, isLast }];
   });
 }
 

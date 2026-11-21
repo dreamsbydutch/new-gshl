@@ -51,8 +51,10 @@ void test("GSHL periods display bounded ratings rather than per-appearance avera
   for (const { value: kind } of PERFORMANCE_KINDS) {
     const stats = performanceDisplayStats(kind, source);
     assert.equal(stats.averageRating, undefined);
-    if (kind !== "playerNhl")
+    if (performanceStats(kind).includes("Rating"))
       assert.ok(stats.Rating! >= 0 && stats.Rating! <= 100);
+    if (kind === "playerCareer" || kind === "teamCareer")
+      assert.equal(stats.Rating, undefined);
     assert.ok(!performanceStats(kind).includes("averageRating"));
   }
   assert.equal(
@@ -87,6 +89,23 @@ void test("GSHL periods display bounded ratings rather than per-appearance avera
   assert.deepEqual(source, before);
 });
 
+void test("minimum games excludes undersized season and weekly performances", () => {
+  assert.equal(
+    qualifiesForPerformance(
+      { GP: 9, P: 40, posGroup: "F" },
+      { ...filters, kind: "playerTotal", stat: "P", minimumGames: 10 },
+    ),
+    false,
+  );
+  assert.equal(
+    qualifiesForPerformance(
+      { GP: 10, P: 40, posGroup: "F" },
+      { ...filters, kind: "playerTotal", stat: "P", minimumGames: 10 },
+    ),
+    true,
+  );
+});
+
 void test("team columns prioritize activity stats and keep the ranking stat visible in every group", () => {
   const all = performanceColumns("teamSeason", "all", "Rating");
   assert.deepEqual(all.slice(0, 4), ["Rating", "ADD", "MS", "BS"]);
@@ -103,14 +122,21 @@ void test("team columns prioritize activity stats and keep the ranking stat visi
 });
 
 void test("every requested table exposes its stored rating and stats", () => {
-  assert.equal(PERFORMANCE_KINDS.length, 8);
+  assert.equal(PERFORMANCE_KINDS.length, 10);
   for (const kind of PERFORMANCE_KINDS) {
     assert.ok(
       performanceStats(kind.value).includes(
-        kind.value === "playerNhl" ? "seasonRating" : "Rating",
+        kind.value.endsWith("Career")
+          ? "P"
+          : kind.value === "playerNhl"
+            ? "seasonRating"
+            : "Rating",
       ),
     );
-    assert.ok(performanceStats(kind.value).includes("GAA"));
+    assert.equal(
+      performanceStats(kind.value).includes("GAA"),
+      kind.value !== "teamCareer",
+    );
   }
   assert.ok(performanceStats("teamSeason").includes("teamW"));
   assert.ok(performanceStats("teamWeek").includes("powerRating"));

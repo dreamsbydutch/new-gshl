@@ -48,3 +48,64 @@ export function selectHomePowerRankingPreview<T>(entries: readonly T[]): T[] {
 export function selectHomeUfaPreview<T>(entries: readonly T[]): T[] {
   return entries.slice(0, HOME_UFA_PREVIEW_LIMIT);
 }
+
+import type { LeagueActivityEvent } from "../../types/league-activity";
+import { groupLeagueActivity } from "./league-activity";
+
+export function prioritizeHomeActivity(
+  events: readonly LeagueActivityEvent[],
+  teamId?: string,
+  opponentId?: string,
+  contenderIds: readonly string[] = [],
+) {
+  const involved = (event: LeagueActivityEvent, id: string | undefined) =>
+    Boolean(
+      id &&
+        (event.teamId === id ||
+          event.trade?.teamA.id === id ||
+          event.trade?.teamB.id === id),
+    );
+  const priority = (event: LeagueActivityEvent) =>
+    involved(event, teamId)
+      ? 0
+      : involved(event, opponentId)
+        ? 1
+        : contenderIds.some((id) => involved(event, id))
+          ? 2
+          : 3;
+  const sorted = [...events].sort(
+    (a, b) =>
+      priority(a) - priority(b) ||
+      b.date.localeCompare(a.date) ||
+      a.id.localeCompare(b.id),
+  );
+  return groupLeagueActivity(sorted);
+}
+
+/** Keep games with incomplete ratings in schedule order after rated games. */
+export function orderHomeMatchups<
+  T extends { homeTeamId: string; awayTeamId: string },
+>(
+  matchups: readonly T[],
+  entries: readonly { team: { id: string }; rating: number | null }[],
+  ownerTeamId?: string,
+) {
+  const ratings = new Map(entries.map(({ team, rating }) => [team.id, rating]));
+  return matchups
+    .map((matchup) => {
+      const home = ratings.get(matchup.homeTeamId);
+      const away = ratings.get(matchup.awayTeamId);
+      return {
+        matchup,
+        isOwn:
+          matchup.homeTeamId === ownerTeamId ||
+          matchup.awayTeamId === ownerTeamId,
+        combined: home != null && away != null ? home + away : -Infinity,
+      };
+    })
+    .sort(
+      (a, b) =>
+        Number(b.isOwn) - Number(a.isOwn) ||
+        (a.combined === b.combined ? 0 : b.combined - a.combined),
+    );
+}

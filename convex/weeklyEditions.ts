@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./lib/scheduling";
 import { isCategoryImpactRating } from "../src/lib/utils/features/stat-rating";
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/prefer-optional-chain */
 import { ConvexError, v } from "convex/values";
@@ -1953,17 +1954,17 @@ async function generateMilestoneForSeason(
 export const latestPublished = query({
   args: {},
   handler: async (ctx) => {
-    const active = await ctx.db
+    const latest = await ctx.db
       .query("weeklyEditions")
-      .withIndex("by_homeActive_publishedAt", (q) => q.eq("isHomeActive", true))
+      .withIndex("by_status", (q) => q.eq("status", "published"))
       .order("desc")
       .first();
-    return active?.status === "published"
+    return latest
       ? buildWeeklyEditionHomeSummary({
-          id: String(active._id),
-          issueLabel: active.issueLabel,
-          content: active.content as WeeklyEditionContent,
-          facts: active.facts as WeeklyEditionFactPacket,
+          id: String(latest._id),
+          issueLabel: latest.issueLabel,
+          content: latest.content as WeeklyEditionContent,
+          facts: latest.facts as WeeklyEditionFactPacket,
         })
       : null;
   },
@@ -3390,7 +3391,8 @@ async function queueAutomaticEdition(
     ? job._id
     : await ctx.db.insert("weeklyEditionGenerationJobs", values);
   if (job) await ctx.db.patch(jobId, values);
-  await ctx.scheduler.runAfter(
+  await scheduleAfter(
+    ctx,
     0,
     internal.weeklyEditions.generateAutomaticEdition,
     { jobId, attempt: values.attempts },

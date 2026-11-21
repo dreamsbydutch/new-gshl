@@ -3,74 +3,41 @@
 import Link from "next/link";
 import {
   BookOpenText,
-  Building2,
   ClipboardList,
-  Ellipsis,
-  Newspaper,
+  Menu,
   ShieldCheck,
-  ChartNoAxesCombined,
 } from "lucide-react";
-import { useAuthSession } from "@gshl-hooks";
+import { useAppSearchParams, useAuthSession } from "@gshl-hooks";
 import type { MainNavbarMoreMenuProps } from "@gshl-types";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@gshl-ui";
 import { cn } from "@gshl-utils";
 
-const moreItems = [
-  {
-    label: "NHL Explorer",
-    description: "Team talent, player GAR, and contract value",
-    href: "/nhl",
-    icon: ChartNoAxesCombined,
-  },
-  {
-    label: "Press Box",
-    description: "League news and weekly editions",
-    href: "/headlines",
-    icon: Newspaper,
-  },
-  {
-    label: "Rulebook",
-    description: "League rules and policies",
-    href: "/rulebook",
-    icon: BookOpenText,
-  },
-  {
-    label: "League Office",
-    description: "League tools and reference views",
-    href: "/leagueoffice",
-    icon: Building2,
-  },
-  {
-    label: "Draft Hub",
-    description: "Live draft board and team rooms",
-    href: "/draft",
-    icon: ClipboardList,
-  },
-];
-
-const adminItem = {
-  label: "Admin",
-  description: "Commissioner tools and TV displays",
-  href: "/admin",
-  icon: ShieldCheck,
-};
-
-function isMenuRouteActive(pathname: string, href: string): boolean {
-  if (href === "/rulebook" && pathname === "/rules") return true;
+function isMenuRouteActive(
+  pathname: string,
+  search: string,
+  href: string,
+): boolean {
+  const [route, query] = href.split("?");
+  if (!route) return false;
   if (
-    href === "/draft" &&
-    (pathname === "/draftboard" || pathname.startsWith("/draftboard/"))
-  ) {
+    route === "/rulebook" &&
+    (pathname === "/rules" || pathname.startsWith("/rules/"))
+  )
     return true;
+  if (route === "/leagueoffice") {
+    return (
+      pathname === route &&
+      new URLSearchParams(search).get("view") ===
+        new URLSearchParams(query).get("view")
+    );
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === route || pathname.startsWith(`${route}/`);
 }
 
 export function MoreNavigationMenu({
@@ -80,8 +47,17 @@ export function MoreNavigationMenu({
 }: MainNavbarMoreMenuProps) {
   const isMobile = placement === "mobile";
   const { session } = useAuthSession();
-  const AdminIcon = adminItem.icon;
-
+  const { search } = useAppSearchParams();
+  const items = [
+    {
+      label: "Free agency",
+      href: "/leagueoffice?view=freeAgents",
+      icon: ClipboardList,
+    },
+    ...(isMobile
+      ? [{ label: "Rulebook", href: "/rulebook", icon: BookOpenText }]
+      : []),
+  ];
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -94,45 +70,34 @@ export function MoreNavigationMenu({
               : "text-slate-700 hover:bg-slate-100",
             isMobile
               ? "flex h-full min-w-0 flex-1 flex-col gap-0.5 rounded-xl px-1 py-1 text-[11px] lg:hidden"
-              : "hidden px-3 py-2 text-sm lg:flex",
+              : "hidden px-2 py-2 text-sm lg:flex xl:px-3",
           )}
-          aria-label="Open more navigation"
+          aria-label="Open league menu"
         >
-          <Ellipsis className="h-5 w-5" aria-hidden="true" />
-          <span>More</span>
+          <Menu className="h-5 w-5" aria-hidden="true" />
+          <span>Menu</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         side={isMobile ? "top" : "bottom"}
         align="end"
-        sideOffset={isMobile ? 12 : 10}
-        className="z-[70] w-72 p-2"
+        sideOffset={8}
+        className="z-[70] max-h-[75dvh] w-52 overflow-y-auto p-1"
       >
-        <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-slate-500">
-          Explore GSHL
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {moreItems.map(({ label, description, href, icon: Icon }) => {
-          const isCurrent = isMenuRouteActive(pathname, href);
+        {items.map(({ label, href, icon: Icon }) => {
+          const isCurrent = isMenuRouteActive(pathname, search, href);
           return (
             <DropdownMenuItem
               key={href}
               asChild
               className={cn(
-                "min-h-12 cursor-pointer rounded-lg px-3 py-2",
+                "min-h-11 cursor-pointer rounded px-3 py-2",
                 isCurrent && "bg-slate-100",
               )}
             >
               <Link href={href} aria-current={isCurrent ? "page" : undefined}>
-                <Icon className="h-5 w-5 text-slate-600" aria-hidden="true" />
-                <span className="min-w-0">
-                  <span className="block font-semibold text-slate-900">
-                    {label}
-                  </span>
-                  <span className="block truncate text-xs text-slate-500">
-                    {description}
-                  </span>
-                </span>
+                <Icon className="h-4 w-4 text-slate-600" aria-hidden="true" />
+                <span className="font-semibold text-slate-900">{label}</span>
               </Link>
             </DropdownMenuItem>
           );
@@ -140,36 +105,26 @@ export function MoreNavigationMenu({
         {session?.user.role === "commissioner" ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-slate-500">
-              Commissioner
-            </DropdownMenuLabel>
             <DropdownMenuItem
               asChild
               className={cn(
-                "min-h-12 cursor-pointer rounded-lg px-3 py-2",
-                isMenuRouteActive(pathname, adminItem.href) && "bg-slate-100",
+                "min-h-11 cursor-pointer rounded px-3 py-2",
+                isMenuRouteActive(pathname, search, "/admin") && "bg-slate-100",
               )}
             >
               <Link
-                href={adminItem.href}
+                href="/admin"
                 aria-current={
-                  isMenuRouteActive(pathname, adminItem.href)
+                  isMenuRouteActive(pathname, search, "/admin")
                     ? "page"
                     : undefined
                 }
               >
-                <AdminIcon
-                  className="h-5 w-5 text-slate-600"
+                <ShieldCheck
+                  className="h-4 w-4 text-slate-600"
                   aria-hidden="true"
                 />
-                <span className="min-w-0">
-                  <span className="block font-semibold text-slate-900">
-                    {adminItem.label}
-                  </span>
-                  <span className="block truncate text-xs text-slate-500">
-                    {adminItem.description}
-                  </span>
-                </span>
+                <span className="font-semibold text-slate-900">Admin</span>
               </Link>
             </DropdownMenuItem>
           </>

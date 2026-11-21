@@ -14,6 +14,7 @@ import {
   selectOwnerContracts,
 } from "./franchise-contracts";
 import { getDateYear, getSeasonEndYear } from "./contract-table";
+import { getContractedRosterPlayerIds } from "./team-roster";
 
 function season(year: number): Season {
   return {
@@ -52,6 +53,44 @@ function contract(id: string, overrides: Partial<Contract> = {}): Contract {
     ...overrides,
   };
 }
+void test("roster marks only players with a playing contract covering today", () => {
+  const today = "2026-04-20";
+  const contracts = [
+    contract("ending", { playerId: "signed", expiryDate: today }),
+    contract("expired", { playerId: "signed", expiryDate: "2026-04-19" }),
+    contract("starting", {
+      playerId: "extension",
+      startDate: today,
+      contractType: [ContractType.EXTENSION],
+    }),
+    contract("future", {
+      playerId: "future",
+      signingDate: "2026-04-21",
+      startDate: "2026-04-21",
+      expiryDate: "2027-04-20",
+    }),
+    contract("signed-before-season", {
+      playerId: "summer-signing",
+      signingDate: today,
+      startDate: "2026-10-01",
+      expiryDate: "2027-04-20",
+    }),
+    contract("traded", {
+      playerId: "former-team",
+      expiryStatus: ContractStatus.TRADE,
+    }),
+    contract("cap-only", { playerId: "expired", expiryDate: "2026-04-19" }),
+    contract("bought-out", {
+      playerId: "buyout",
+      expiryStatus: ContractStatus.BUYOUT,
+    }),
+  ];
+  assert.deepEqual(
+    getContractedRosterPlayerIds(contracts, today),
+    new Set(["signed", "extension", "summer-signing"]),
+  );
+});
+
 function player(fullName = "Player One"): Player {
   return {
     id: "player-1",

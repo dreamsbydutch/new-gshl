@@ -22,6 +22,7 @@ export type StandingsNavigationView =
   | "nhl";
 
 export type LockerRoomNavigationView =
+  | "overview"
   | "roster"
   | "salary"
   | "history"
@@ -126,6 +127,7 @@ export interface NavigationStoreState {
   selectedLockerRoomType: string;
   selectedLeagueOfficeType: string;
   selectedStandingsType: string;
+  statsSearch: string;
   setScheduleType: (type: string) => void;
   setSeasonId: (id: string) => void;
   setWeekId: (id: string) => void;
@@ -133,6 +135,7 @@ export interface NavigationStoreState {
   setLockerRoomType: (type: string) => void;
   setLeagueOfficeType: (type: string) => void;
   setStandingsType: (type: string) => void;
+  setStatsSearch: (search: string) => void;
   resetNavigation: () => void;
   setDefaults: (defaults: Partial<NavigationStoreState>) => void;
 }

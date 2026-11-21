@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./scheduling";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
@@ -74,7 +75,7 @@ async function enqueue(
     message: request.apply ? "Apply run queued" : "Dry run queued",
     createdAt: now,
   });
-  await ctx.scheduler.runAfter(0, internal.jobRunner.run, { runId });
+  await scheduleAfter(ctx, 0, internal.jobRunner.run, { runId });
   return (await ctx.db.get(runId))!;
 }
 
@@ -139,7 +140,7 @@ export async function cancelJob(ctx: MutationCtx, runId: Id<"jobRuns">) {
     createdAt: now,
   });
   if (status === "cancelled" && run.parentRunId) {
-    await ctx.scheduler.runAfter(0, internal.jobRunner.run, {
+    await scheduleAfter(ctx, 0, internal.jobRunner.run, {
       runId: run.parentRunId,
     });
   }
@@ -225,7 +226,7 @@ export async function finishJob(
     createdAt: now,
   });
   if (run.parentRunId) {
-    await ctx.scheduler.runAfter(0, internal.jobRunner.run, {
+    await scheduleAfter(ctx, 0, internal.jobRunner.run, {
       runId: run.parentRunId,
     });
   }

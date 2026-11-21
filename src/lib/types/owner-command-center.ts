@@ -109,6 +109,7 @@ export interface OwnerCommandCenterData {
   pendingOffers: OwnerCommandCenterPendingOffer[];
   ufaWindowOpen?: boolean;
   listedPlayers: OwnerCommandCenterListedPlayer[];
+  currentMatchup?: OwnerCommandCenterMatchup | null;
   upcomingMatchups: OwnerCommandCenterMatchup[];
   recentMatchups: OwnerCommandCenterMatchup[];
   tradeActivity: OwnerCommandCenterTradeActivity[];

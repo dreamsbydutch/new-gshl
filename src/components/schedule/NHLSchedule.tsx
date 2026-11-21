@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useNHLScheduleData } from "@gshl-hooks/features/useNHLScheduleData";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { WeeklyScheduleSkeleton } from "@gshl-skeletons";
-import { nhlGameStatus, formatNHLUpdatedAt } from "@gshl-utils/features/nhl";
+import { nhlGameStatus } from "@gshl-utils/features/nhl";
 
 export function NHLSchedule() {
   const { data, week, isLoading, error, retry, getMatchupHref } =
@@ -12,22 +12,6 @@ export function NHLSchedule() {
   if (isLoading) return <WeeklyScheduleSkeleton />;
   return (
     <div className="space-y-5 px-3 py-6">
-      <header className="text-center">
-        <h2 className="text-xl font-bold">
-          NHL Schedule{week ? ` · Week ${week.weekNum}` : ""}
-        </h2>
-        <p className="text-xs text-gray-500">
-          All times Eastern · Scores and schedule refresh every 15 minutes
-        </p>
-        {data && (
-          <p className="text-xs text-gray-500">
-            Last updated:{" "}
-            <time dateTime={new Date(data.updatedAt).toISOString()}>
-              {formatNHLUpdatedAt(data.updatedAt)}
-            </time>
-          </p>
-        )}
-      </header>
       {error && (
         <p role="alert" className="text-center text-sm">
           {error}{" "}
@@ -51,7 +35,7 @@ export function NHLSchedule() {
           key={day.date}
           className="overflow-hidden rounded-lg border bg-white"
         >
-          <h3 className="bg-gray-100 px-4 py-3 text-sm font-bold">
+          <h2 className="bg-gray-100 px-4 py-3 text-sm font-bold">
             {new Intl.DateTimeFormat("en-US", {
               weekday: "long",
               month: "short",
@@ -59,7 +43,7 @@ export function NHLSchedule() {
               year: "numeric",
               timeZone: "UTC",
             }).format(new Date(`${day.date}T12:00:00Z`))}
-          </h3>
+          </h2>
           {!day.games.length && (
             <p className="px-4 py-4 text-sm text-gray-500">
               No NHL games scheduled.

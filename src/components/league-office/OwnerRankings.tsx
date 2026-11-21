@@ -154,9 +154,9 @@ export function OwnerRankings() {
 
   if (!data.rankings.length) {
     return (
-      <div className="mx-auto max-w-2xl rounded-lg border border-slate-200 bg-white p-8 text-center">
+      <div className="mx-auto max-w-2xl border-b border-slate-200 bg-white py-3">
         <Users className="mx-auto h-6 w-6 text-slate-400" />
-        <h2 className="mt-3 font-oswald text-2xl text-slate-900">
+        <h2 className="mt-2 text-sm font-semibold text-slate-900">
           No GMs are on the ladder yet
         </h2>
       </div>
@@ -164,8 +164,8 @@ export function OwnerRankings() {
   }
 
   return (
-    <div className="mx-auto max-w-[100rem] pb-8 pt-4">
-      <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white sm:mt-4">
+    <div className="mx-auto max-w-[100rem] py-2">
+      <div className="overflow-hidden border-b border-slate-200 bg-white">
         <div className="overflow-x-auto overscroll-x-contain">
           <table className="w-full min-w-[1280px] border-separate border-spacing-0 text-left text-[11px] sm:min-w-[1480px] sm:text-xs">
             <caption className="sr-only">

@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./lib/scheduling";
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/prefer-optional-chain */
 import { makeFunctionReference, mutationGeneric } from "convex/server";
 import { v } from "convex/values";
@@ -107,7 +108,7 @@ export const complete = mutationGeneric({
       resultChunks: args.chunks,
       updatedAt: Date.now(),
     });
-    await ctx.scheduler.runAfter(0, runner, { runId: task.runId });
+    await scheduleAfter(ctx, 0, runner, { runId: task.runId });
   },
 });
 
@@ -128,6 +129,6 @@ export const fail = mutationGeneric({
       error: args.error.slice(0, 4000),
       updatedAt: Date.now(),
     });
-    await ctx.scheduler.runAfter(0, runner, { runId: task.runId });
+    await scheduleAfter(ctx, 0, runner, { runId: task.runId });
   },
 });

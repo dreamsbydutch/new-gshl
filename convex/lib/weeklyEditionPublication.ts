@@ -73,35 +73,6 @@ async function patchEdition(
   return ctx.db.get(edition._id);
 }
 
-/** Publication and homepage selection commit together; delayed issues cannot move Home backwards. */
-async function activateNewPublication(ctx: MutationCtx, edition: Edition) {
-  const active = await ctx.db
-    .query("weeklyEditions")
-    .withIndex("by_homeActive_publishedAt", (q) => q.eq("isHomeActive", true))
-    .collect();
-  if (
-    active.some(
-      (row) =>
-        row._id !== edition._id &&
-        (toUtcTimestamp(row.scheduledFor) ?? 0) >=
-          (toUtcTimestamp(edition.scheduledFor) ?? 0),
-    )
-  )
-    return edition;
-
-  const updatedAt = Date.now();
-  for (const row of active) {
-    if (row._id !== edition._id)
-      await ctx.db.patch(row._id, { isHomeActive: false, updatedAt });
-  }
-  // Presentation changes preserve the content editor and create no revisions.
-  if (!edition.isHomeActive) {
-    await ctx.db.patch(edition._id, { isHomeActive: true, updatedAt });
-    return (await ctx.db.get(edition._id))!;
-  }
-  return edition;
-}
-
 async function persistPublication(
   ctx: MutationCtx,
   existing: Edition | null,
@@ -143,7 +114,7 @@ async function persistPublication(
   });
   return {
     state: "inserted" as const,
-    existing: await activateNewPublication(ctx, (await ctx.db.get(id))!),
+    existing: (await ctx.db.get(id))!,
   };
 }
 
@@ -163,7 +134,7 @@ export async function publishTemplateEdition(
   }
   if (
     existing &&
-    existing.generationMode !== "template" &&
+    (existing.status === "hidden" || existing.generationMode !== "template") &&
     options.replaceEditorial !== true
   ) {
     return { state: "protected" as const, existing };
@@ -247,11 +218,7 @@ export async function publishAiEdition(
     "openai",
     request.editedBy,
   );
-  // Upgrade an existing template too, including templates created before
-  // automatic homepage activation was introduced.
-  return request.automatic && existing && result.existing
-    ? activateNewPublication(ctx, result.existing)
-    : result.existing;
+  return result.existing;
 }
 
 export async function editEdition(

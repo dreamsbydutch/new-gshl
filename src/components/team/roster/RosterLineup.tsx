@@ -6,10 +6,12 @@ import { RosterPlayerCard } from "./RosterPlayerCard";
 export function RosterLineup({
   teamLineup,
   contractByPlayerId,
+  contractedPlayerIds,
   showSalaries,
   nhlTeamByAbbr,
 }: {
   teamLineup: Array<Array<Array<Player | null>>>;
+  contractedPlayerIds: ReadonlySet<string>;
   contractByPlayerId: Map<string, Contract>;
   showSalaries: boolean;
   nhlTeamByAbbr: Map<string, NHLTeam>;
@@ -28,6 +30,7 @@ export function RosterLineup({
                   <RosterPlayerCard
                     key={player.id}
                     player={player}
+                    isUnderContract={contractedPlayerIds.has(player.id)}
                     contract={contractByPlayerId.get(player.id)}
                     showSalaries={showSalaries}
                     nhlTeamByAbbr={nhlTeamByAbbr}

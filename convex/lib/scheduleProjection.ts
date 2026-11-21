@@ -1,5 +1,6 @@
 import {
   buildCategoryResults,
+  isMatchupDetailsComplete,
   resolveMatchupCategories,
   resolveMatchupScore,
 } from "../../src/lib/utils/features/matchup-details";
@@ -111,6 +112,10 @@ export function projectWeeklyScheduleMatchups(
         awayScore,
         homeWin: outcome.homeWin,
         awayWin: outcome.awayWin,
+        isComplete: isMatchupDetailsComplete(
+          { ...row, isComplete: row.isComplete ?? false },
+          null,
+        ),
       };
     });
 }

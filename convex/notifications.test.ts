@@ -413,11 +413,11 @@ void test("start reminder waits for its window and stale rescheduling cancels pu
   assert.equal(f.rows("notificationEvents").size, 1);
 });
 
-void test("eight independent preferences preserve explicit opt-outs", () => {
-  assert.equal(NOTIFICATION_OPTIONS.length, 8);
+void test("nine independent preferences preserve explicit opt-outs", () => {
+  assert.equal(NOTIFICATION_OPTIONS.length, 9);
   assert.equal(
     new Set(NOTIFICATION_OPTIONS.map((option) => option.key)).size,
-    8,
+    9,
   );
   assert.deepEqual(notificationChoice("draft_turn"), {
     inbox: true,

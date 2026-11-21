@@ -1,3 +1,4 @@
+import { scheduleAfter } from "./lib/scheduling";
 import { v } from "convex/values";
 import {
   internalAction,
@@ -103,7 +104,8 @@ async function removeIfExpired(ctx: MutationCtx, id: Id<"matchupPreviews">) {
     startsAt: window.startsAt,
     expiresAt: window.expiresAt,
   });
-  await ctx.scheduler.runAfter(
+  await scheduleAfter(
+    ctx,
     window.expiresAt - Date.now(),
     internal.matchupPreviews.expire,
     { id },
@@ -131,7 +133,7 @@ export const cleanup = internalMutation({
     for (const row of rows) await removeIfExpired(ctx, row._id);
     for (const row of legacy) await removeIfExpired(ctx, row._id);
     if (rows.length === 100 || legacy.length === 100)
-      await ctx.scheduler.runAfter(0, internal.matchupPreviews.cleanup, {});
+      await scheduleAfter(ctx, 0, internal.matchupPreviews.cleanup, {});
   },
 });
 
@@ -141,7 +143,7 @@ export const scan = internalMutation({
   handler: async (ctx): Promise<void> => {
     const now = Date.now();
     if (easternHour(now) !== 4) return;
-    await ctx.scheduler.runAfter(0, internal.matchupPreviews.cleanup, {});
+    await scheduleAfter(ctx, 0, internal.matchupPreviews.cleanup, {});
     const weeks = await ctx.db
       .query("weeks")
       .withIndex("by_startDate", (q) =>
@@ -218,7 +220,8 @@ export const scan = internalMutation({
           if (existing)
             await ctx.db.patch(id, { ...values, failure: undefined });
           claimed.push(id);
-          await ctx.scheduler.runAfter(
+          await scheduleAfter(
+            ctx,
             expiresAt - now,
             internal.matchupPreviews.expire,
             { id },
@@ -226,7 +229,8 @@ export const scan = internalMutation({
         }
         // A conversation needs one job; legacy finish still chains its second article.
         if (claimed[0])
-          await ctx.scheduler.runAfter(
+          await scheduleAfter(
+            ctx,
             queued++ * 10000,
             internal.matchupPreviews.generate,
             { id: claimed[0], attemptAt: now },
@@ -382,7 +386,7 @@ export const finish = internalMutation({
       row.format !== "conversation" &&
       opposing.attemptAt === args.attemptAt
     )
-      await ctx.scheduler.runAfter(0, internal.matchupPreviews.generate, {
+      await scheduleAfter(ctx, 0, internal.matchupPreviews.generate, {
         id: opposing._id,
         attemptAt: opposing.attemptAt,
       });

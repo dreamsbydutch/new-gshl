@@ -17,6 +17,7 @@ const DEFAULT_STORE_STATE = {
   selectedLockerRoomType: "roster",
   selectedLeagueOfficeType: "draft",
   selectedStandingsType: "overall",
+  statsSearch: "",
 } as const;
 
 /**
@@ -43,6 +44,7 @@ export const useNavStore = create<NavigationStoreState>()(
       setLockerRoomType: (type) => set({ selectedLockerRoomType: type }),
       setLeagueOfficeType: (type) => set({ selectedLeagueOfficeType: type }),
       setStandingsType: (type) => set({ selectedStandingsType: type }),
+      setStatsSearch: (search) => set({ statsSearch: search }),
       resetNavigation: () => set(DEFAULT_STORE_STATE),
       setDefaults: (defaults) => set({ ...get(), ...defaults }),
     }),
@@ -56,6 +58,7 @@ export const useNavStore = create<NavigationStoreState>()(
         selectedLockerRoomType: state.selectedLockerRoomType,
         selectedLeagueOfficeType: state.selectedLeagueOfficeType,
         selectedStandingsType: state.selectedStandingsType,
+        statsSearch: state.statsSearch,
       }),
     },
   ),

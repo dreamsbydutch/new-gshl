@@ -185,6 +185,7 @@ void test("new AI and template editions replace the previous week's homepage sel
     const { edition: previous } = await published(f);
     await f.ctx.db.patch(previous._id, {
       isHomeActive: true,
+      updatedAt: 1234,
       editedBy: "commissioner" as Id<"authUsers">,
     });
     const request = nextSource();
@@ -198,16 +199,18 @@ void test("new AI and template editions replace the previous week's homepage sel
           })
         : (await publishTemplateEdition(f.ctx, request)).existing;
     assert.ok(edition);
-    const active = f.rows("weeklyEditions").filter((row) => row.isHomeActive);
-    assert.equal(active.length, 1);
-    assert.equal(active[0]?.editionKey, request.editionKey);
-    assert.equal(f.get(previous._id)?.isHomeActive, false);
+    assert.equal(f.get(previous._id)?.updatedAt, 1234);
     assert.equal(f.get(previous._id)?.status, "published");
     assert.equal(f.get(previous._id)?.editedBy, "commissioner");
     const home = (await invokeMutation(latestPublished, f.ctx, {})) as {
       id: string;
     } | null;
-    assert.equal(home?.id, active[0]?._id);
+    assert.equal(
+      home?.id,
+      f
+        .rows("weeklyEditions")
+        .find((row) => row.editionKey === request.editionKey)?._id,
+    );
     assert.equal(f.rows("weeklyEditionRevisions").length, 0);
   }
 });
@@ -221,51 +224,35 @@ void test("the first publication appears on the homepage without manual activati
   assert.equal(home?.id, String(edition._id));
 });
 
-void test("older catch-up publications cannot displace a newer homepage edition", async () => {
+void test("Home shows the most recently created public edition, including catch-up issues", async () => {
   const f = fixture();
-  const newer = (await publishTemplateEdition(f.ctx, nextSource())).existing!;
-  await f.ctx.db.patch(newer._id, { isHomeActive: true });
-  const { request, edition: older, raw } = await published(f);
-  await invokeMutation(finalizeAiGeneration, f.ctx, {
-    ...request,
-    existingEditionId: older._id,
-    expectedUpdatedAt: older.updatedAt,
-    automatic: true,
-    sourceHash: hashWeeklyEditionSource(request.facts),
-    raw,
+  const pinned = (await publishTemplateEdition(f.ctx, nextSource())).existing!;
+  const { edition: catchUp } = await published(f);
+  await f.ctx.db.patch(pinned._id, {
+    isHomeActive: true,
+    publishedAt: Date.now() + 1000,
   });
-  assert.deepEqual(
-    f
-      .rows("weeklyEditions")
-      .filter((row) => row.isHomeActive)
-      .map((row) => row._id),
-    [newer._id],
-  );
+  await f.ctx.db.patch(catchUp._id, { isHomeActive: false });
+  f.put("weeklyEditions", "hidden", { ...catchUp, status: "hidden" });
+  const home = (await invokeMutation(latestPublished, f.ctx, {})) as {
+    id: string;
+  } | null;
+  assert.equal(home?.id, catchUp._id);
 });
 
-void test("automatic AI upgrade activates an already-created newer template edition", async () => {
+void test("automatic template refresh keeps a hidden edition off Home", async () => {
   const f = fixture();
-  const { edition: previous } = await published(f);
-  const request = nextSource();
-  const newer = (await publishTemplateEdition(f.ctx, request)).existing!;
-  // Reproduce an existing template saved before publication activated Home.
-  await f.ctx.db.patch(previous._id, { isHomeActive: true });
-  await f.ctx.db.patch(newer._id, { isHomeActive: false });
-  await invokeMutation(finalizeAiGeneration, f.ctx, {
-    ...request,
-    existingEditionId: newer._id,
-    expectedUpdatedAt: newer.updatedAt,
-    automatic: true,
-    sourceHash: hashWeeklyEditionSource(request.facts),
-    raw: JSON.stringify(buildTemplateWeeklyEdition(request.facts)),
+  const { edition, request } = await published(f);
+  await invokeMutation(setVisibility, f.ctx, {
+    editionId: edition._id,
+    status: "hidden",
   });
-  assert.deepEqual(
-    f
-      .rows("weeklyEditions")
-      .filter((row) => row.isHomeActive)
-      .map((row) => row._id),
-    [newer._id],
-  );
+  const refreshed = await publishTemplateEdition(f.ctx, {
+    ...request,
+    facts: { ...request.facts, issueLabel: "Updated facts" },
+  });
+  assert.equal(refreshed.state, "protected");
+  assert.equal(await invokeMutation(latestPublished, f.ctx, {}), null);
 });
 
 void test("publication interface shares unchanged/protection rules and snapshots replacements", async () => {

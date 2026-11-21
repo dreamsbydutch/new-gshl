@@ -5,6 +5,13 @@ import {
   getAppShellRouteContext,
 } from "./app-shell";
 
+void test("Records remains reachable through the league menu", () => {
+  assert.deepEqual(getAppShellRouteContext("/records"), {
+    title: "Records",
+    activeNavId: "more",
+  });
+});
+
 void test("calculates bounded page scroll progress", () => {
   assert.equal(calculatePageScrollProgress(0, 2000, 1000), 0);
   assert.equal(calculatePageScrollProgress(500, 2000, 1000), 50);
@@ -16,6 +23,8 @@ void test("calculates bounded page scroll progress", () => {
 
 void test("maps primary routes to the correct persistent navigation item", () => {
   assert.equal(getAppShellRouteContext("/").activeNavId, "home");
+  assert.equal(getAppShellRouteContext("/stats").activeNavId, "more");
+  assert.equal(getAppShellRouteContext("/teams").activeNavId, "lockerroom");
   assert.equal(getAppShellRouteContext("/schedule").activeNavId, "schedule");
   assert.equal(getAppShellRouteContext("/standings").activeNavId, "standings");
   assert.equal(
@@ -29,18 +38,33 @@ void test("maps primary routes to the correct persistent navigation item", () =>
   });
 });
 
+void test("groups Stats under Menu and gives Rulebook a desktop destination", () => {
+  for (const path of ["/stats", "/players"]) {
+    assert.deepEqual(getAppShellRouteContext(path), {
+      title: "Stats",
+      activeNavId: "more",
+    });
+  }
+  for (const path of ["/rulebook", "/rules", "/rulebook/contracts"]) {
+    assert.deepEqual(getAppShellRouteContext(path), {
+      title: "Rulebook",
+      activeNavId: "rulebook",
+    });
+  }
+});
+
 void test("keeps detail routes connected to their parent destination", () => {
   assert.deepEqual(getAppShellRouteContext("/matchup/weekly-123"), {
     title: "Matchup",
     activeNavId: "schedule",
     backHref: "/schedule",
-    backLabel: "Back to Schedule",
+    backLabel: "Back to Matchups",
   });
   assert.deepEqual(getAppShellRouteContext("/headlines/edition-123"), {
-    title: "Press Box",
+    title: "League news",
     activeNavId: "more",
     backHref: "/headlines",
-    backLabel: "Back to Press Box",
+    backLabel: "Back to League news",
   });
 });
 
@@ -54,7 +78,7 @@ void test("restores source-aware Matchup context in the shell back link", () => 
       title: "Matchup",
       activeNavId: "schedule",
       backHref: "/schedule?view=team&season=12&owner=owner-4",
-      backLabel: "Back to Schedule",
+      backLabel: "Back to Matchups",
     },
   );
   assert.equal(
@@ -82,7 +106,7 @@ void test("gives draft child routes a deterministic way back to the board", () =
 });
 
 void test("uses segment boundaries and leaves fallback pages unselected", () => {
-  assert.equal(getAppShellRouteContext("/draftboard").title, "Draft Hub");
+  assert.equal(getAppShellRouteContext("/draftboard").title, "Draft hub");
   assert.deepEqual(getAppShellRouteContext("/draftboardish"), {
     title: "GSHL",
     activeNavId: null,
