@@ -7,7 +7,7 @@ import type {
   StandingsTeamCardProps,
 } from "@gshl-types";
 import { useStandingsTeamDetail } from "@gshl-hooks";
-import { cn } from "@gshl-utils";
+import { cn, formatRank } from "@gshl-utils";
 import { resolveMatchupCategories } from "@gshl-utils/features/matchup-details";
 
 const RESULT_TONE_CLASS = {
@@ -125,7 +125,7 @@ function StandingsCategoryRanks({
                 <dd className="font-mono text-[10px] font-semibold tabular-nums text-slate-800 sm:text-xs">
                   {category?.rank == null
                     ? "—"
-                    : `${category.isTied ? "T" : "#"}${category.rank}`}
+                    : `${category.isTied ? "T" : ""}${formatRank(category.rank)}`}
                 </dd>
               </div>
             );

@@ -41,18 +41,11 @@ export function NHLStandingsHomeCard({
       )}
       {data?.standings.length ? (
         <>
-          <p className="py-1 text-center text-[10px] text-slate-500">
-            {!data.isPreseason && (
-              <span className="mr-2">
-                <span
-                  aria-hidden="true"
-                  className="mr-1 inline-block h-2 w-2 rounded-sm bg-slate-200"
-                />
-                Playoff position
-              </span>
-            )}
-            {data.isPreseason ? "Preseason · " : ""}PTS
-          </p>
+          {data.isPreseason && (
+            <p className="py-1 text-center text-[10px] text-slate-500">
+              Preseason
+            </p>
+          )}
           <div className="mx-auto grid max-w-md grid-cols-[1fr_1fr_1.5rem_1fr_1fr] sm:grid-cols-[1fr_1fr_2rem_1fr_1fr]">
             <div className="col-span-2 border-b text-center text-[10px] font-semibold">
               Eastern

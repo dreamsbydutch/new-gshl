@@ -7,7 +7,6 @@ import {
   Eye,
   EyeOff,
   FileClock,
-  House,
   LoaderCircle,
   Newspaper,
   Save,
@@ -206,23 +205,6 @@ export function Newsroom() {
     );
   };
 
-  const toggleHomeActive = async () => {
-    if (!selectedEdition) return;
-    await newsroom.setHomeActive.mutateAsync({
-      editionId: selectedEdition.isHomeActive ? undefined : selectedEdition.id,
-    });
-    showNotice(
-      selectedEdition.isHomeActive
-        ? "No newsletter is active on the homepage."
-        : "This is now the only newsletter active on the homepage.",
-    );
-  };
-
-  const clearHomeActive = async () => {
-    await newsroom.setHomeActive.mutateAsync({});
-    showNotice("No newsletter is active on the homepage.");
-  };
-
   const toggleSectionActive = async (
     sectionId: string,
     currentlyActive: boolean,
@@ -246,7 +228,6 @@ export function Newsroom() {
     newsroom.publishImport.error ??
     newsroom.updateManual.error ??
     newsroom.setVisibility.error ??
-    newsroom.setHomeActive.error ??
     newsroom.setSectionActive.error ??
     newsroom.restoreRevision.error;
 
@@ -562,7 +543,6 @@ export function Newsroom() {
                   >
                     {edition.generationMode.replaceAll("_", " ")} ·{" "}
                     {edition.status}
-                    {edition.isHomeActive ? " · home active" : ""}
                   </span>
                 </button>
               ))}
@@ -601,29 +581,6 @@ export function Newsroom() {
               >
                 {selectedEdition.status === "published" ? <EyeOff /> : <Eye />}
                 {selectedEdition.status === "published" ? "Hide" : "Restore"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void toggleHomeActive()}
-                disabled={
-                  selectedEdition.status !== "published" ||
-                  newsroom.setHomeActive.isPending
-                }
-              >
-                <House />
-                {selectedEdition.isHomeActive
-                  ? "Remove from Home"
-                  : "Make active on Home"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void clearHomeActive()}
-                disabled={newsroom.setHomeActive.isPending}
-              >
-                <EyeOff />
-                No newsletter on Home
               </Button>
               {selectedEdition.status === "published" ? (
                 <WhatsAppShareButton

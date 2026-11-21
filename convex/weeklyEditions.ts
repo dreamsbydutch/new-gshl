@@ -1954,17 +1954,17 @@ async function generateMilestoneForSeason(
 export const latestPublished = query({
   args: {},
   handler: async (ctx) => {
-    const active = await ctx.db
+    const latest = await ctx.db
       .query("weeklyEditions")
-      .withIndex("by_homeActive_publishedAt", (q) => q.eq("isHomeActive", true))
+      .withIndex("by_status", (q) => q.eq("status", "published"))
       .order("desc")
       .first();
-    return active?.status === "published"
+    return latest
       ? buildWeeklyEditionHomeSummary({
-          id: String(active._id),
-          issueLabel: active.issueLabel,
-          content: active.content as WeeklyEditionContent,
-          facts: active.facts as WeeklyEditionFactPacket,
+          id: String(latest._id),
+          issueLabel: latest.issueLabel,
+          content: latest.content as WeeklyEditionContent,
+          facts: latest.facts as WeeklyEditionFactPacket,
         })
       : null;
   },
