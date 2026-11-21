@@ -156,7 +156,7 @@ type TeamScheduleResultClassOptions = {
 
 const SCHEDULE_GAME_TYPE_STYLES: Record<string, GameTypeDisplay> = {
   QF: { label: "QF", className: "text-orange-800 bg-orange-100" },
-  SF: { label: "SF", className: "text-slate-700 bg-slate-100" },
+  SF: { label: "SF", className: "text-semifinal-700 bg-semifinal-100" },
   F: { label: "F", className: "text-yellow-800 bg-yellow-100" },
   LT: { label: "LT", className: "text-brown-800 bg-brown-100" },
 };
@@ -174,10 +174,10 @@ const SCHEDULE_BACKGROUND_CLASSES = {
   QFHHHH: "bg-orange-200/30",
   QFHHSV: "bg-orange-200/30",
   QFSVHH: "bg-orange-200/30",
-  SFSVSV: "bg-slate-200/30",
-  SFHHHH: "bg-slate-200/30",
-  SFHHSV: "bg-slate-200/30",
-  SFSVHH: "bg-slate-200/30",
+  SFSVSV: "bg-semifinal-200/30",
+  SFHHHH: "bg-semifinal-200/30",
+  SFHHSV: "bg-semifinal-200/30",
+  SFSVHH: "bg-semifinal-200/30",
   FSVSV: "bg-yellow-200/30",
   FHHHH: "bg-yellow-200/30",
   FHHSV: "bg-yellow-200/30",

@@ -1,5 +1,21 @@
+import colors from "tailwindcss/colors";
 import animatePlugin from "tailwindcss-animate";
 import { type Config } from "tailwindcss";
+
+// Existing slate and gray utilities carry the league's surface and text colors.
+const leaguePalette = {
+  50: "#fff7f6",
+  100: "#fbe8e6",
+  200: "#f0cdca",
+  300: "#dfaba8",
+  400: "#c88280",
+  500: "#a35456",
+  600: "#903b41",
+  700: "#832631",
+  800: "#721829",
+  900: "#581320",
+  950: "#381019",
+};
 
 export default {
   darkMode: ["class"],
@@ -74,6 +90,9 @@ export default {
         toggleClick: "toggleClick 75ms ease-in-out",
       },
       colors: {
+        slate: leaguePalette,
+        gray: leaguePalette,
+        semifinal: colors.slate,
         hotel: {
           "50": "#ffefe8",
           "100": "#ffddc1",

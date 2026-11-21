@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --background: 6 75% 98%;
+    --foreground: 350 33% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 350 33% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    --popover-foreground: 350 33% 14%;
+    --primary: 350 72% 32%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 6 52% 94%;
+    --secondary-foreground: 350 64% 24%;
+    --muted: 6 36% 96%;
+    --muted-foreground: 353 20% 40%;
+    --accent: 5 65% 91%;
+    --accent-foreground: 350 64% 24%;
+    --destructive: 5 81% 39%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
+    --border: 4 46% 85%;
+    --input: 3 35% 74%;
+    --ring: 350 72% 38%;
+    --chart-1: 350 72% 38%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
@@ -34,26 +34,26 @@
     --app-page-context-row-height: 2.75rem;
   }
   .dark {
-    --background: 0 0% 3.9%;
+    --background: 350 28% 8%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 350 25% 12%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 350 25% 12%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
+    --primary: 4 75% 76%;
+    --primary-foreground: 350 62% 12%;
+    --secondary: 350 30% 20%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+    --muted: 350 20% 16%;
+    --muted-foreground: 4 22% 73%;
+    --accent: 350 38% 24%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
+    --border: 350 22% 25%;
+    --input: 350 23% 32%;
+    --ring: 4 75% 76%;
+    --chart-1: 4 75% 76%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
@@ -116,7 +116,7 @@
   }
 
   .rulebook-page header {
-    background: #0f172a !important;
+    background: theme("colors.slate.950") !important;
     color: white !important;
     print-color-adjust: exact;
   }

@@ -4,8 +4,8 @@
   "id": "/",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0f172a",
+  "background_color": "#fef7f6",
+  "theme_color": "#381019",
   "icons": [
     {
       "src": "/gshl-notification-icon.png",

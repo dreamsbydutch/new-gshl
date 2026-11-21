@@ -51,7 +51,7 @@ export const getRatingColorClass = (seasonRk: number | null) => {
 export function getRosterRatingClass(seasonRk: Player["seasonRk"]) {
   return typeof seasonRk === "number" && Number.isFinite(seasonRk)
     ? getRatingColorClass(seasonRk)
-    : "bg-gray-200 text-gray-700";
+    : "bg-neutral-200 text-neutral-700";
 }
 
 export function getContractedRosterPlayerIds(
