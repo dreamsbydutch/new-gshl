@@ -357,6 +357,7 @@ export function LockerRoomContent() {
             contracts: currentContracts,
             currentTeam,
             showSalaries: showRosterSalaries,
+            showContractIcons: true,
           }}
         />
       )}

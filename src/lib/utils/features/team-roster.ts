@@ -60,10 +60,16 @@ export function getContractedRosterPlayerIds(
 ) {
   const ids = new Set<string>();
   for (const contract of contracts) {
-    if (!isPlayingContract(contract)) continue;
-    const start = normalizeDateOnlyValue(contract.startDate);
+    if (
+      !isPlayingContract(contract) ||
+      contract.expiryStatus === ContractStatus.TRADE
+    )
+      continue;
+    const signed = normalizeDateOnlyValue(
+      contract.signingDate || contract.startDate,
+    );
     const end = normalizeDateOnlyValue(contract.expiryDate);
-    if (start && end && start <= today && today <= end)
+    if (signed && end && signed <= today && today <= end)
       ids.add(contract.playerId);
   }
   return ids;

@@ -7,7 +7,9 @@ import { getContractedRosterPlayerIds } from "@gshl-utils/features/team-roster";
 import { useLeagueToday } from "./useLeagueToday";
 import { useTeamRosterData } from "./useTeamRosterData";
 
-export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
+export function useTeamRosterView(
+  options: UseTeamRosterDataOptions & { showContractIcons?: boolean } = {},
+) {
   const rosterData = useTeamRosterData(options);
   const { data: nhlTeams = [], isLoading: nhlTeamsLoading } = useNHLTeams();
 
@@ -24,8 +26,12 @@ export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
 
   const today = useLeagueToday();
   const contractedPlayerIds = useMemo(
-    () => getContractedRosterPlayerIds(options.contracts ?? [], today),
-    [options.contracts, today],
+    () =>
+      getContractedRosterPlayerIds(
+        options.showContractIcons ? (options.contracts ?? []) : [],
+        today,
+      ),
+    [options.showContractIcons, options.contracts, today],
   );
 
   const contractByPlayerId = useMemo(

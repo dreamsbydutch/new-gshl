@@ -65,8 +65,19 @@ void test("roster marks only players with a playing contract covering today", ()
     }),
     contract("future", {
       playerId: "future",
+      signingDate: "2026-04-21",
       startDate: "2026-04-21",
       expiryDate: "2027-04-20",
+    }),
+    contract("signed-before-season", {
+      playerId: "summer-signing",
+      signingDate: today,
+      startDate: "2026-10-01",
+      expiryDate: "2027-04-20",
+    }),
+    contract("traded", {
+      playerId: "former-team",
+      expiryStatus: ContractStatus.TRADE,
     }),
     contract("cap-only", { playerId: "expired", expiryDate: "2026-04-19" }),
     contract("bought-out", {
@@ -76,7 +87,7 @@ void test("roster marks only players with a playing contract covering today", ()
   ];
   assert.deepEqual(
     getContractedRosterPlayerIds(contracts, today),
-    new Set(["signed", "extension"]),
+    new Set(["signed", "extension", "summer-signing"]),
   );
 });
 

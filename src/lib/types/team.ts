@@ -50,6 +50,7 @@ export interface UseTeamColorResult {
 }
 
 export interface TeamRosterProps {
+  showContractIcons?: boolean;
   players: Player[] | undefined;
   contracts: Contract[];
   currentTeam: GSHLTeam;

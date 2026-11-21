@@ -11,6 +11,7 @@ export function TeamRoster({
   contracts,
   currentTeam,
   showSalaries = false,
+  showContractIcons = false,
 }: TeamRosterProps) {
   const {
     benchPlayers,
@@ -25,6 +26,7 @@ export function TeamRoster({
     players,
     contracts,
     currentTeam,
+    showContractIcons,
   });
 
   return (
