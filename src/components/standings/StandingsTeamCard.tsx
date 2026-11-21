@@ -122,10 +122,19 @@ function StandingsCategoryRanks({
                 <dt className="order-2 text-[9px] text-slate-500 sm:text-[10px]">
                   {label}
                 </dt>
-                <dd className="font-mono text-[10px] font-semibold tabular-nums text-slate-800 sm:text-xs">
+                <dd
+                  className={cn(
+                    "font-mono text-[10px] font-semibold tabular-nums text-slate-800 sm:text-xs",
+                    category?.rank === 1 && "font-bold text-yellow-700",
+                    category?.isLast && "text-red-700",
+                  )}
+                >
                   {category?.rank == null
                     ? "—"
                     : `${category.isTied ? "T" : ""}${formatRank(category.rank)}`}
+                  {category?.isLast && (
+                    <span className="sr-only"> (last place)</span>
+                  )}
                 </dd>
               </div>
             );

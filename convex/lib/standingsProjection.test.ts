@@ -59,6 +59,7 @@ test("category ranks share ties and exclude missing or invalid totals", () => {
     }).categoryRanks;
   for (const teamId of ["selected", "tied"]) {
     assert.ok(project(teamId).every((category) => category.isTied === true));
+    assert.ok(project(teamId).every((category) => category.isLast === true));
     assert.deepEqual(
       project(teamId).map(({ label, rank }) => [label, rank]),
       [
@@ -70,6 +71,7 @@ test("category ranks share ties and exclude missing or invalid totals", () => {
   }
   assert.deepEqual(project("missing"), []);
   assert.ok(project("leader").every((category) => category.isTied === false));
+  assert.ok(project("leader").every((category) => category.isLast === false));
 });
 
 test("standings ranks include historical scoring categories", () => {
