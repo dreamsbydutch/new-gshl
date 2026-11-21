@@ -17,6 +17,7 @@ export function TeamRoster({
     irPlayers,
     injuryStatus,
     contractByPlayerId,
+    contractedPlayerIds,
     currentRoster,
     nhlTeamByAbbr,
     teamLineup,
@@ -50,6 +51,7 @@ export function TeamRoster({
       <RosterLineup
         teamLineup={teamLineup}
         contractByPlayerId={contractByPlayerId}
+        contractedPlayerIds={contractedPlayerIds}
         showSalaries={showSalaries}
         nhlTeamByAbbr={nhlTeamByAbbr}
       />
@@ -58,6 +60,7 @@ export function TeamRoster({
         title="Bench"
         players={benchPlayers}
         contractByPlayerId={contractByPlayerId}
+        contractedPlayerIds={contractedPlayerIds}
         showSalaries={showSalaries}
         nhlTeamByAbbr={nhlTeamByAbbr}
       />
@@ -66,6 +69,7 @@ export function TeamRoster({
         title="IR"
         players={irPlayers}
         contractByPlayerId={contractByPlayerId}
+        contractedPlayerIds={contractedPlayerIds}
         showSalaries={showSalaries}
         nhlTeamByAbbr={nhlTeamByAbbr}
       />

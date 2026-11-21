@@ -1,5 +1,6 @@
 "use client";
 
+import { FileSignature } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { PlayerInjuryBadge } from "@gshl-components/player/PlayerInjuryBadge";
 import type { Contract, NHLTeam, Player } from "@gshl-types";
@@ -17,12 +18,14 @@ import {
 export function RosterPlayerCard({
   player,
   contract,
+  isUnderContract,
   showSalaries,
   nhlTeamByAbbr,
   className,
 }: {
   player: Player;
   contract?: Contract;
+  isUnderContract: boolean;
   showSalaries: boolean;
   nhlTeamByAbbr: Map<string, NHLTeam>;
   className?: string;
@@ -44,6 +47,15 @@ export function RosterPlayerCard({
     <div className={cn("grid grid-cols-2 px-2 text-center", className)}>
       <div className="col-span-3 text-sm">
         {player.fullName}
+        {isUnderContract && (
+          <span
+            className="ml-1 inline-block align-middle text-emerald-700"
+            title="Under contract"
+          >
+            <FileSignature className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">Under contract</span>
+          </span>
+        )}
         <PlayerInjuryBadge name={player.fullName} teams={player.nhlTeam} />
       </div>
       <div className="text-2xs">{player.nhlPos?.toString() ?? ""}</div>

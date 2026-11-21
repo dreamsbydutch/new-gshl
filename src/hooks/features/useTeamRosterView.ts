@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import type { Contract, NHLTeam, UseTeamRosterDataOptions } from "@gshl-types";
 import { useNHLTeams } from "../main";
+import { getContractedRosterPlayerIds } from "@gshl-utils/features/team-roster";
+import { useLeagueToday } from "./useLeagueToday";
 import { useTeamRosterData } from "./useTeamRosterData";
 
 export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
@@ -20,6 +22,12 @@ export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
     [nhlTeams],
   );
 
+  const today = useLeagueToday();
+  const contractedPlayerIds = useMemo(
+    () => getContractedRosterPlayerIds(options.contracts ?? [], today),
+    [options.contracts, today],
+  );
+
   const contractByPlayerId = useMemo(
     () =>
       (options.contracts ?? []).reduce((map, contract: Contract) => {
@@ -35,6 +43,7 @@ export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
     ...rosterData,
     nhlTeamByAbbr,
     contractByPlayerId,
+    contractedPlayerIds,
     isLoading,
     ready: rosterData.ready && !nhlTeamsLoading,
   };

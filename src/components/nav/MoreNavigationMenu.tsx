@@ -5,12 +5,9 @@ import {
   BookOpenText,
   ClipboardList,
   Menu,
-  CalendarDays,
   ShieldCheck,
-  ChartNoAxesCombined,
 } from "lucide-react";
 import { useAppSearchParams, useAuthSession } from "@gshl-hooks";
-import { useStatsNavigation } from "@gshl-hooks/main/useNav";
 import type { MainNavbarMoreMenuProps } from "@gshl-types";
 import {
   DropdownMenu,
@@ -33,12 +30,6 @@ function isMenuRouteActive(
     (pathname === "/rules" || pathname.startsWith("/rules/"))
   )
     return true;
-  if (route === "/stats" && pathname === "/players") return true;
-  if (
-    route === "/draft" &&
-    (pathname === "/draftboard" || pathname.startsWith("/draftboard/"))
-  )
-    return true;
   if (route === "/leagueoffice") {
     return (
       pathname === route &&
@@ -57,16 +48,12 @@ export function MoreNavigationMenu({
   const isMobile = placement === "mobile";
   const { session } = useAuthSession();
   const { search } = useAppSearchParams();
-  const statsNavigation = useStatsNavigation();
   const items = [
-    { label: "Stats", href: statsNavigation.href, icon: ChartNoAxesCombined },
     {
       label: "Free agency",
       href: "/leagueoffice?view=freeAgents",
       icon: ClipboardList,
     },
-    { label: "Draft hub", href: "/draft", icon: CalendarDays },
-    { label: "NHL Explorer", href: "/nhl", icon: ChartNoAxesCombined },
     ...(isMobile
       ? [{ label: "Rulebook", href: "/rulebook", icon: BookOpenText }]
       : []),

@@ -1,9 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import {
@@ -21,11 +19,7 @@ import {
   useContractData,
   useTeamAwards,
 } from "@gshl-hooks";
-import {
-  getOwnerTeamIds,
-  resolveSalaryCapSeason,
-  formatMoney,
-} from "@gshl-utils";
+import { getOwnerTeamIds, resolveSalaryCapSeason } from "@gshl-utils";
 import { isRosterSigningWindowOpen } from "@gshl-utils/features/roster-signing-window";
 import { resolveUfaSigningSeason } from "@gshl-utils/features/ufa-deadline";
 import {
@@ -288,47 +282,13 @@ export function LockerRoomContent() {
   }
   return (
     <>
-      <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
-      {selectedLockerRoomType === "roster" ? (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <Link
-            className="text-sm font-semibold"
-            href={`/lockerroom?view=salary&owner=${selectedOwnerId}&season=${contextSeason?.id ?? ""}`}
-          >
-            Cap space:{" "}
-            {teamContractTableData.capSpaceWindow[0]
-              ? formatMoney(
-                  teamContractTableData.capSpaceWindow[0].remaining,
-                  true,
-                )
-              : "—"}
-            <span className="mt-1 block text-xs font-normal text-slate-500">
-              Contracts & commitments →
-            </span>
-          </Link>
-          {yahooTeamId ? (
-            <a
-              href={`https://hockey.fantasysports.yahoo.com/hockey/44541/${encodeURIComponent(yahooTeamId)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Manage lineup on Yahoo (opens in a new tab)"
-              title="Manage lineup on Yahoo (opens in a new tab)"
-              className="gshl-text-action gap-2"
-            >
-              <Image
-                src="/yahoo-fantasy.png"
-                alt=""
-                aria-hidden="true"
-                width={112}
-                height={38}
-                className="h-auto w-28"
-              />
-              <span>Manage lineup</span>
-              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-            </a>
-          ) : null}
-        </div>
-      ) : null}
+      <LockerRoomHeader
+        currentTeam={currentTeam}
+        headingLevel={2}
+        yahooTeamId={
+          selectedLockerRoomType === "roster" ? yahooTeamId : undefined
+        }
+      />
       {isInactiveOwner && (
         <p className="mb-3 text-xs text-slate-500">
           <span className="font-semibold">Inactive owner</span>

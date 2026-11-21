@@ -18,6 +18,7 @@ import type {
 } from "./team-schedule";
 
 export interface LockerRoomHeaderProps {
+  yahooTeamId?: string;
   currentTeam: GSHLTeam;
   headingLevel?: 1 | 2;
 }

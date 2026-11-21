@@ -8,11 +8,13 @@ export function RosterReserveSection({
   players,
   title,
   contractByPlayerId,
+  contractedPlayerIds,
   showSalaries,
   nhlTeamByAbbr,
 }: {
   players: Player[];
   title: "Bench" | "IR";
+  contractedPlayerIds: ReadonlySet<string>;
   contractByPlayerId: Map<string, Contract>;
   showSalaries: boolean;
   nhlTeamByAbbr: Map<string, NHLTeam>;
@@ -32,6 +34,7 @@ export function RosterReserveSection({
           <RosterPlayerCard
             key={player.id}
             player={player}
+            isUnderContract={contractedPlayerIds.has(player.id)}
             contract={contractByPlayerId.get(player.id)}
             showSalaries={showSalaries}
             nhlTeamByAbbr={nhlTeamByAbbr}

@@ -55,6 +55,7 @@ const TeamInfo = ({
 export function LockerRoomHeader({
   currentTeam,
   headingLevel,
+  yahooTeamId,
 }: LockerRoomHeaderProps) {
   return (
     <header className="mb-2 flex items-center gap-2 border-b border-slate-200 py-2">
@@ -64,6 +65,24 @@ export function LockerRoomHeader({
         formattedOwnerName={formatOwnerName(currentTeam)}
         headingLevel={headingLevel}
       />
+      {yahooTeamId && (
+        <a
+          href={`https://hockey.fantasysports.yahoo.com/hockey/44541/${encodeURIComponent(yahooTeamId)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Manage lineup on Yahoo (opens in a new tab)"
+          title="Manage lineup on Yahoo (opens in a new tab)"
+          className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded px-1 focus-visible:ring-2 focus-visible:ring-slate-500"
+        >
+          <Image
+            src="/yahoo-fantasy.png"
+            alt=""
+            width={48}
+            height={16}
+            className="h-auto w-12"
+          />
+        </a>
+      )}
     </header>
   );
 }
