@@ -1,6 +1,6 @@
 "use client";
 
-import { FileSignature } from "lucide-react";
+import { CircleDollarSign } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { PlayerInjuryBadge } from "@gshl-components/player/PlayerInjuryBadge";
 import type { Contract, NHLTeam, Player } from "@gshl-types";
@@ -52,7 +52,7 @@ export function RosterPlayerCard({
             className="ml-1 inline-block align-middle text-emerald-700"
             title="Under contract"
           >
-            <FileSignature className="h-3.5 w-3.5" aria-hidden="true" />
+            <CircleDollarSign className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="sr-only">Under contract</span>
           </span>
         )}

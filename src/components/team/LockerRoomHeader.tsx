@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import type {
   LockerRoomHeaderProps,
@@ -72,15 +73,16 @@ export function LockerRoomHeader({
           rel="noopener noreferrer"
           aria-label="Manage lineup on Yahoo (opens in a new tab)"
           title="Manage lineup on Yahoo (opens in a new tab)"
-          className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded px-1 focus-visible:ring-2 focus-visible:ring-slate-500"
+          className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded px-1 text-slate-600 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-slate-500"
         >
           <Image
             src="/yahoo-fantasy.png"
             alt=""
-            width={48}
-            height={16}
-            className="h-auto w-12"
+            width={96}
+            height={32}
+            className="h-auto w-20 sm:w-24"
           />
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
         </a>
       )}
     </header>
