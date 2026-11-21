@@ -285,9 +285,7 @@ export function LockerRoomContent() {
       <LockerRoomHeader
         currentTeam={currentTeam}
         headingLevel={2}
-        yahooTeamId={
-          selectedLockerRoomType === "roster" ? yahooTeamId : undefined
-        }
+        yahooTeamId={yahooTeamId}
       />
       {isInactiveOwner && (
         <p className="mb-3 text-xs text-slate-500">

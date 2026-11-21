@@ -1,18 +1,11 @@
 "use client";
 
-import {
-  useLeagueActivity,
-  useSeasonState,
-  useTeamScheduleStats,
-} from "../main";
+import { useLeagueActivity, useSeasonState } from "../main";
 import { useLeagueToday } from "./useLeagueToday";
 import { useOwnerCommandCenter } from "./useOwnerCommandCenter";
 import { useStandingsData } from "./useStandingsData";
-import {
-  prioritizeHomeActivity,
-  matchupProgress,
-} from "@gshl-utils/features/home-dashboard";
-import { calculateStandingsPoints, resolveDraftHubSeason } from "@gshl-utils";
+import { prioritizeHomeActivity } from "@gshl-utils/features/home-dashboard";
+import { resolveDraftHubSeason } from "@gshl-utils";
 
 export function useHomeDashboard() {
   const seasonState = useSeasonState({ autoSelect: false });
@@ -26,19 +19,11 @@ export function useHomeDashboard() {
   const teams = standings.groups.flatMap((group) => group.teams);
   const own = owner.data;
   const rankIndex = teams.findIndex((team) => team.id === own?.team?.id);
-  const standing = teams[rankIndex];
   const matchup = own?.matchup.current ?? own?.matchup.next ?? null;
   const today = useLeagueToday();
   const activity = useLeagueActivity(season?.id, 30, false, {
     end: today,
     days: 1,
-  });
-  const stats = useTeamScheduleStats({
-    seasonId: season?.id ?? "",
-    weekId: matchup?.weekId ?? "",
-    homeTeamId: matchup?.homeTeamId ?? "",
-    awayTeamId: matchup?.awayTeamId ?? "",
-    enabled: Boolean(own?.matchup.current),
   });
   const now = Date.now();
   const contractsDue =
@@ -68,21 +53,6 @@ export function useHomeDashboard() {
     owner,
     matchup,
     attention,
-    standingsLoading: standings.isLoading,
-    standing:
-      standing && season
-        ? {
-            rank: rankIndex + 1,
-            points: standing.seasonStats
-              ? calculateStandingsPoints(standing.seasonStats, season)
-              : null,
-          }
-        : null,
-    progress: matchupProgress(
-      matchup?.weekStartDate ?? null,
-      matchup?.weekEndDate ?? null,
-    ),
-    timestamps: stats.data.updatedAt,
     activityLoading: activity.isLoading,
     activity: prioritizeHomeActivity(
       activity.data,

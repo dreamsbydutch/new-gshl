@@ -32,7 +32,10 @@ export function HomeContent() {
           GSHL home
         </h1>
         {view.season ? (
-          <HomeScoreboard seasonId={view.season.id} />
+          <HomeScoreboard
+            seasonId={view.season.id}
+            ownerTeamId={owner?.team?.id}
+          />
         ) : (
           <p className="py-4 text-sm text-slate-500">
             The league schedule will appear when a season is available.

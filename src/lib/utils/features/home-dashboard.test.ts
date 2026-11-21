@@ -12,7 +12,7 @@ import {
   selectHomeUfaPreview,
   isHomeDraftHubVisible,
   prioritizeHomeActivity,
-  matchupProgress,
+  orderHomeMatchups,
 } from "./home-dashboard";
 import type { LeagueActivityEvent } from "../../types/league-activity";
 import { limitLeagueActivity } from "./league-activity";
@@ -107,19 +107,27 @@ void test("Home includes every team-day group and every move", () => {
   assert.deepEqual(events, before);
 });
 
-void test("matchup progress handles absent schedules and includes the end date", () => {
-  assert.equal(matchupProgress(null, null), null);
-  assert.equal(
-    matchupProgress("2026-11-09", "2026-11-15", Date.parse("2026-11-08")),
-    0,
-  );
-  assert.equal(
-    matchupProgress("2026-11-09", "2026-11-15", Date.parse("2026-11-16")),
-    100,
-  );
-  assert.ok(
-    (matchupProgress("2026-11-09", "2026-11-15", Date.parse("2026-11-15")) ??
-      100) < 100,
+void test("weekly matchup order prioritizes either owner side and then combined rating", () => {
+  const games = Object.freeze([
+    { homeTeamId: "a", awayTeamId: "b" },
+    { homeTeamId: "c", awayTeamId: "d" },
+    { homeTeamId: "e", awayTeamId: "f" },
+    { homeTeamId: "g", awayTeamId: "h" },
+  ]);
+  const entries = [100, null, 30, 50, 55, 45, 60, 20].map((rating, i) => ({
+    team: { id: "abcdefgh".charAt(i) },
+    rating,
+  }));
+  const ordered = (teamId?: string) =>
+    orderHomeMatchups(games, entries, teamId).map(
+      ({ matchup }) => matchup.homeTeamId,
+    );
+  assert.deepEqual(ordered(), ["e", "c", "g", "a"]);
+  assert.deepEqual(ordered("b"), ["a", "e", "c", "g"]);
+  assert.deepEqual(ordered("g"), ["g", "e", "c", "a"]);
+  assert.deepEqual(
+    orderHomeMatchups(games, [], "h").map((entry) => entry.isOwn),
+    [true, false, false, false],
   );
 });
 

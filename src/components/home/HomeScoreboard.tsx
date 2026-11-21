@@ -25,18 +25,27 @@ export function HomeScoreboardSkeleton() {
   );
 }
 
-export function HomeScoreboard({ seasonId }: { seasonId: string }) {
+export function HomeScoreboard({
+  seasonId,
+  ownerTeamId,
+}: {
+  seasonId: string;
+  ownerTeamId?: string;
+}) {
   const { week, matchupGroups, isLoading, isScheduleLoading, error } =
-    useHomeScoreboard(seasonId);
+    useHomeScoreboard(seasonId, ownerTeamId);
   const track = useRef<HTMLUListElement>(null);
   const currentWeekStart = useRef<HTMLLIElement>(null);
+  const firstCurrentMatchupId = matchupGroups.find(
+    (group) => group.isCurrentWeek,
+  )?.matchups[0]?.matchup.id;
   useEffect(() => {
     const list = track.current;
     const item = currentWeekStart.current;
     if (isLoading || isScheduleLoading || !list || !item) return;
     list.scrollLeft +=
       item.getBoundingClientRect().left - list.getBoundingClientRect().left - 2;
-  }, [week?.id, isLoading, isScheduleLoading]);
+  }, [week?.id, firstCurrentMatchupId, isLoading, isScheduleLoading]);
   if (isLoading) return <HomeScoreboardSkeleton />;
 
   return (
@@ -93,7 +102,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                     aria-label={`Week ${matchupWeek.weekNum} matchups`}
                     className="flex gap-2"
                   >
-                    {matchups.map((matchup) => {
+                    {matchups.map(({ matchup, isOwn }) => {
                       const isFinal = matchup.isComplete;
                       const isUpcoming =
                         !isFinal && matchupPhase === "upcoming";
@@ -105,7 +114,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                       return (
                         <li
                           key={matchup.id}
-                          className="w-24 shrink-0 snap-start"
+                          className={`w-24 shrink-0 snap-start ${isOwn ? "pb-4" : ""}`}
                         >
                           <Link
                             href={buildMatchupNavigationHref(matchup.id, {
@@ -114,8 +123,12 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                               season: seasonId,
                               week: matchupWeek.id,
                             })}
-                            title={`${status} matchup`}
-                            className={`relative flex items-center gap-2 rounded border border-slate-200 px-2 py-1.5 text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${!isFinal && matchupPhase === "current" ? "bg-sky-50/70 hover:bg-sky-50" : "bg-white hover:bg-slate-50"}`}
+                            title={
+                              isOwn
+                                ? `Your matchup (${status})`
+                                : `${status} matchup`
+                            }
+                            className={`relative flex items-center gap-2 rounded border ${isOwn ? "border-blue-600 ring-1 ring-inset ring-blue-600" : "border-slate-200"} px-2 py-1.5 text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${!isFinal && matchupPhase === "current" ? "bg-sky-50/70 hover:bg-sky-50" : "bg-white hover:bg-slate-50"}`}
                           >
                             <span className="sr-only">{status}. </span>
                             <div className="min-w-0 flex-1 space-y-1">
@@ -170,6 +183,11 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                             >
                               {isFinal ? "F" : null}
                             </span>
+                            {isOwn && (
+                              <span className="absolute inset-x-0 top-full mt-0.5 text-center text-[10px] font-semibold text-blue-700">
+                                Your matchup
+                              </span>
+                            )}
                           </Link>
                         </li>
                       );

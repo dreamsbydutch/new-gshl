@@ -82,14 +82,30 @@ export function prioritizeHomeActivity(
   return groupLeagueActivity(sorted);
 }
 
-export function matchupProgress(
-  start: string | null,
-  end: string | null,
-  now = Date.now(),
+/** Keep games with incomplete ratings in schedule order after rated games. */
+export function orderHomeMatchups<
+  T extends { homeTeamId: string; awayTeamId: string },
+>(
+  matchups: readonly T[],
+  entries: readonly { team: { id: string }; rating: number | null }[],
+  ownerTeamId?: string,
 ) {
-  if (!start || !end) return null;
-  const from = Date.parse(start),
-    to = Date.parse(end) + 86_400_000;
-  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
-  return Math.max(0, Math.min(100, ((now - from) / (to - from)) * 100));
+  const ratings = new Map(entries.map(({ team, rating }) => [team.id, rating]));
+  return matchups
+    .map((matchup) => {
+      const home = ratings.get(matchup.homeTeamId);
+      const away = ratings.get(matchup.awayTeamId);
+      return {
+        matchup,
+        isOwn:
+          matchup.homeTeamId === ownerTeamId ||
+          matchup.awayTeamId === ownerTeamId,
+        combined: home != null && away != null ? home + away : -Infinity,
+      };
+    })
+    .sort(
+      (a, b) =>
+        Number(b.isOwn) - Number(a.isOwn) ||
+        (a.combined === b.combined ? 0 : b.combined - a.combined),
+    );
 }
