@@ -38,7 +38,7 @@ function TeamSlot({
         {label}
       </span>
       <div className="flex min-w-0 items-center lg:flex-1 lg:gap-2">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center">
           {team?.logoUrl ? (
             <Image
               src={team.logoUrl}
@@ -149,11 +149,13 @@ function MatchupCard({
         <Image
           src={matchup.logoUrl}
           alt={matchup.title}
-          width={72}
-          height={72}
+          width={56}
+          height={56}
           className={cn(
-            "absolute left-1/2 h-[72px] w-[72px] -translate-x-1/2 object-contain",
-            conferenceLogoPlacement === "above" ? "bottom-full" : "top-full",
+            "absolute left-1/2 h-14 w-14 -translate-x-1/2 object-contain mix-blend-multiply",
+            conferenceLogoPlacement === "above"
+              ? "bottom-full mb-2"
+              : "top-full mt-2",
           )}
         />
       ) : null}
