@@ -70,7 +70,7 @@ export function NHLScheduleHomeCard() {
           </p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {schedule.games.slice(0, 5).map((game) => {
+            {schedule.games.map((game) => {
               const hasScore = ["LIVE", "CRIT", "FINAL", "OFF"].includes(
                 game.gameState,
               );
