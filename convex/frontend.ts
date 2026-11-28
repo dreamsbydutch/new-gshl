@@ -1044,7 +1044,7 @@ export const ufaHomeCatalog = query({
   args: {},
   handler: async (ctx) => {
     const [catalog, viewerOwnerId, groups] = await Promise.all([
-      loadUfaCatalog(ctx.db),
+      loadUfaCatalog(ctx.db, true),
       activeViewerOwnerId(ctx),
       unresolvedUfaOfferGroups(ctx),
     ]);
@@ -1114,8 +1114,11 @@ export const ufaHomeCatalog = query({
       return player ? [player] : [];
     });
     const selectedPlayerIdSet = new Set(selectedPlayerIds);
-    const nhlStats = catalog.nhlStats.filter((row) =>
-      selectedPlayerIdSet.has(String(row.playerId)),
+    const nhlStats = await loadLatestNhlStats(
+      ctx.db,
+      catalog.allOrderedSeasons,
+      catalog.signingSeason,
+      selectedPlayerIds,
     );
     const contracts = catalog.contracts.filter(
       (contract) =>
