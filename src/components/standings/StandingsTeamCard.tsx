@@ -62,7 +62,7 @@ function StandingsGameList({
                 <span className="sr-only">{description}</span>
                 <div
                   aria-hidden="true"
-                  className="flex min-h-7 items-center justify-center gap-1"
+                  className="flex min-h-7 flex-wrap items-center justify-center gap-x-1 gap-y-0.5"
                 >
                   <span className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center">
                     {game.opponentLogoUrl ? (
@@ -84,7 +84,7 @@ function StandingsGameList({
                       </span>
                     )}
                   </span>
-                  <span className="flex min-w-0 flex-col items-start">
+                  <span className="flex flex-none flex-col items-start">
                     <span className="whitespace-nowrap text-[9px] leading-3 text-slate-500">
                       {game.weekLabel} {venue}
                     </span>
