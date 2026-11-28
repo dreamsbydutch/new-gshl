@@ -7,7 +7,7 @@ import type {
   StandingsTeamCardProps,
 } from "@gshl-types";
 import { useStandingsTeamDetail } from "@gshl-hooks";
-import { cn, formatRank } from "@gshl-utils";
+import { cn } from "@gshl-utils";
 import { resolveMatchupCategories } from "@gshl-utils/features/matchup-details";
 
 const RESULT_TONE_CLASS = {
@@ -23,72 +23,75 @@ function StandingsGameList({
   title,
 }: StandingsGameListProps) {
   return (
-    <div>
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+    <div className="min-w-0">
+      <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500">
         {title}
       </p>
       {games.length ? (
-        <ul className="space-y-1">
+        <ul className="flex">
           {games.map((game) => {
-            // Older query responses carry venue only in upcoming result labels.
             const venue =
               game.venueLabel ??
               (game.resultLabel === "@"
                 ? "@"
                 : game.resultLabel === "vs"
                   ? "v"
-                  : null);
-            const venueDescription =
-              venue === "@" ? "Away at" : venue === "v" ? "Home vs" : "Against";
-            const weekLabel = game.weekLabel.replace(/^W(?=\d)/, "Week ");
+                  : "");
+            const description = [
+              game.weekLabel,
+              venue === "@" ? "Away at" : venue === "v" ? "Home vs" : "Against",
+              game.opponentName,
+              game.opponentRank
+                ? "power rank " + game.opponentRank
+                : "power rank unavailable",
+              game.resultLabel,
+            ].join(" ");
             return (
               <li
                 key={game.id}
-                title={`${weekLabel}: ${venueDescription} ${game.opponentName}`}
-                className="rounded bg-white px-2 py-1"
+                className="min-w-0 flex-1 text-center"
+                title={description}
               >
-                <div className="flex min-h-7 items-center gap-1.5">
-                  <span className="sr-only">{venueDescription}</span>
-                  <span aria-hidden="true" className="text-xs text-slate-500">
-                    {venue}
+                <span className="sr-only">{description}</span>
+                <div aria-hidden="true" className="flex flex-col items-center">
+                  <span className="text-[10px] text-slate-500">
+                    {game.weekLabel} {venue}
                   </span>
-                  {game.opponentLogoUrl ? (
-                    <Image
-                      src={game.opponentLogoUrl}
-                      alt=""
-                      width={24}
-                      height={24}
-                      className="h-6 w-6 shrink-0 object-contain"
-                    />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[9px] font-semibold text-slate-600"
-                    >
-                      {game.opponentName.slice(0, 2).toUpperCase()}
+                  <span className="relative my-0.5 inline-flex h-7 w-7 items-center justify-center">
+                    {game.opponentLogoUrl ? (
+                      <Image
+                        src={game.opponentLogoUrl}
+                        alt=""
+                        width={28}
+                        height={28}
+                        className="h-7 w-7 object-contain"
+                      />
+                    ) : (
+                      <span className="rounded bg-slate-200 px-1 text-xs">
+                        {game.opponentName.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="absolute -bottom-1 -right-2 rounded bg-white px-0.5 text-[9px] font-bold leading-tight ring-1 ring-slate-200">
+                      {game.opponentRank ? "#" + game.opponentRank : "\u2014"}
                     </span>
-                  )}
-                  <span className="min-w-0 flex-1 break-words text-xs text-slate-700">
-                    {game.opponentName}
                   </span>
-                  {game.isComplete ? (
+                  {(game.isComplete || title === "Current") && (
                     <span
                       className={cn(
-                        "whitespace-nowrap font-mono text-xs font-semibold tabular-nums",
+                        "mt-1 whitespace-nowrap text-[11px] font-semibold tabular-nums",
                         RESULT_TONE_CLASS[game.resultTone],
                       )}
                     >
                       {game.resultLabel}
                     </span>
-                  ) : null}
+                  )}
                 </div>
-                <span className="text-[10px] text-slate-400">{weekLabel}</span>
               </li>
             );
           })}
         </ul>
       ) : (
-        <p className="py-1 text-xs text-slate-400">{emptyLabel}</p>
+        <p className="text-center text-[10px] text-slate-500">{emptyLabel}</p>
       )}
     </div>
   );
@@ -101,47 +104,45 @@ function StandingsCategoryRanks({
   const columns = seasonCategories.length
     ? resolveMatchupCategories(seasonCategories)
     : [];
+  const ranked = columns
+    .flatMap(({ label }) => {
+      const category = categories.find((item) => item.label === label);
+      return category?.rank != null ? [category] : [];
+    })
+    .sort((a, b) => a.rank! - b.rank!);
+  if (!ranked.length)
+    return <p className="text-xs text-slate-500">No category ranks yet.</p>;
+  const best = ranked.slice(0, 2);
+  const weakest = ranked
+    .filter((item) => item.rank! > best[best.length - 1]!.rank!)
+    .slice(-2);
   return (
-    <div className="border-t border-slate-200/70 pt-2">
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        Category ranks
-      </p>
-      {columns.length ? (
-        <dl className="grid grid-cols-3 gap-1 sm:grid-cols-5">
-          {columns.map(({ label }) => {
-            const category = categories.find((item) => item.label === label);
-            return (
-              <div
-                key={label}
-                title={`${label}: ${category?.value ?? "—"}`}
-                className="min-w-0 rounded bg-white px-2 py-1.5"
-              >
-                <dt className="text-[10px] text-slate-500 sm:text-[10px]">
-                  {label}
-                </dt>
-                <dd className="text-sm font-semibold tabular-nums text-slate-900">
-                  {category?.value ?? "\u2014"}
-                </dd>
-                <dd
-                  className={cn(
-                    "font-mono text-[10px] font-semibold tabular-nums text-slate-800 sm:text-xs",
-                    category?.rank === 1 && "font-bold text-yellow-700",
-                    category?.isLast && "text-red-700",
-                  )}
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+      {(
+        [
+          ["Best", best],
+          ["Lowest", weakest],
+        ] as const
+      ).map(
+        ([title, items]) =>
+          items.length > 0 && (
+            <div key={title} className="flex items-baseline gap-1">
+              <span className="font-medium text-slate-500">{title}</span>
+              {items.map((item) => (
+                <span
+                  key={item.label}
+                  className="whitespace-nowrap"
+                  title={item.label + " season value: " + item.value}
                 >
-                  {category?.rank == null
-                    ? "—"
-                    : `${category.isTied ? "T" : ""}${formatRank(category.rank)}`}
-                  {category?.isLast && (
-                    <span className="sr-only"> (last place)</span>
-                  )}
-                </dd>
-              </div>
-            );
-          })}
-        </dl>
-      ) : (
-        <p className="text-xs text-slate-400">No category ranks yet.</p>
+                  {item.label}{" "}
+                  <b>
+                    {item.isTied ? "T" : "#"}
+                    {item.rank}
+                  </b>
+                </span>
+              ))}
+            </div>
+          ),
       )}
     </div>
   );
@@ -174,23 +175,42 @@ export function StandingsTeamCard({
   }
 
   return (
-    <div className="space-y-2 rounded-md bg-slate-50 px-3 py-2.5">
-      <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-1.5 rounded-md bg-slate-50 px-2 py-2">
+      <div className="grid grid-cols-[2fr_1.2fr_2fr] divide-x divide-slate-200">
         <StandingsGameList
-          title="Past games"
+          title="Last two"
           games={context.previousGames}
           emptyLabel="None yet"
         />
         <StandingsGameList
-          title="Upcoming"
+          title="Current"
+          games={context.currentGame ? [context.currentGame] : []}
+          emptyLabel="No game"
+        />
+        <StandingsGameList
+          title="Next two"
           games={context.upcomingGames}
           emptyLabel="None scheduled"
         />
+      </div>
+      <div className="flex flex-wrap items-baseline gap-x-3 border-t border-slate-200 pt-1 text-[11px]">
+        {context.powerRank != null && (
+          <span>
+            Power <b>#{context.powerRank}</b>
+          </span>
+        )}
+        <span className="text-slate-500">Opponent badges show power rank</span>
       </div>
       <StandingsCategoryRanks
         categories={context.categoryRanks}
         seasonCategories={seasonCategories}
       />
+      {!!context.awardRaces?.length && (
+        <p className="text-[11px]">
+          <span className="font-medium text-slate-500">Award races</span>{" "}
+          {context.awardRaces.join(", ")}
+        </p>
+      )}
     </div>
   );
 }

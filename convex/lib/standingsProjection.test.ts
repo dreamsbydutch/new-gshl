@@ -199,6 +199,20 @@ test("standings detail selects only the rendered matchup window", () => {
     ),
     ["game-2", "game-3", "game-4", "game-5"],
   );
+  const datedWeeks = weeks.map((week) => ({
+    ...week,
+    startDate: `2026-01-0${week.weekNum}`,
+    endDate: `2026-01-0${week.weekNum}`,
+  }));
+  assert.deepEqual(
+    selectStandingsDetailMatchups(
+      "team-1",
+      matchups,
+      datedWeeks,
+      "2026-01-04",
+    ).map((game) => game._id),
+    ["game-2", "game-3", "game-4", "game-5", "game-6"],
+  );
 });
 
 test("standings detail scopes and orders only the top three player totals", () => {
@@ -267,6 +281,8 @@ test("standings detail deduplicates team-bounded total-stat lookups", () => {
 test("standings detail projects the complete expanded-card DTO", () => {
   const result = projectStandingsTeamDetail({
     teamId: "team-1",
+    today: "2026-01-08",
+    seasonEnd: "2026-05-01",
     owner: {
       firstName: "First",
       lastName: "Owner",
@@ -303,6 +319,7 @@ test("standings detail projects the complete expanded-card DTO", () => {
       },
       {
         gshlTeamId: "team-3",
+        powerRk: 7,
         G: 5,
         A: 30,
         P: 20,
@@ -318,6 +335,7 @@ test("standings detail projects the complete expanded-card DTO", () => {
     matchups: [
       {
         _id: "previous",
+        awayRank: 3,
         weekId: "week-1",
         homeTeamId: "team-1",
         awayTeamId: "team-2",
@@ -327,6 +345,7 @@ test("standings detail projects the complete expanded-card DTO", () => {
       },
       {
         _id: "upcoming",
+        homeRank: 15,
         weekId: "week-2",
         homeTeamId: "team-3",
         awayTeamId: "team-1",
@@ -383,8 +402,10 @@ test("standings detail projects the complete expanded-card DTO", () => {
       ["SV%", 2],
     ],
   );
+  assert.deepEqual(result.awardRaces, ["Rocket Richard", "Art Ross"]);
   assert.deepEqual(result.previousGames, [
     {
+      opponentRank: 3,
       id: "previous",
       isComplete: true,
       venueLabel: "v",
@@ -397,6 +418,7 @@ test("standings detail projects the complete expanded-card DTO", () => {
   ]);
   assert.deepEqual(result.upcomingGames, [
     {
+      opponentRank: 7,
       id: "upcoming",
       isComplete: false,
       venueLabel: "@",

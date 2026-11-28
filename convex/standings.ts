@@ -120,6 +120,7 @@ export const teamDetail = query({
         ),
       ),
     ]);
+    const today = new Date().toISOString().slice(0, 10);
     const weeks = weekRows.filter(present);
     const seasonPlayerTotals = playerTotalPages
       .flat()
@@ -128,6 +129,7 @@ export const teamDetail = query({
       String(team._id),
       matchupRows,
       weeks,
+      today,
     );
     const opponentTeamIds = [
       ...new Set(
@@ -169,6 +171,8 @@ export const teamDetail = query({
       owner,
       conference,
       teamStats,
+      today,
+      seasonEnd: (await ctx.db.get(args.seasonId))?.endDate,
       matchups: selectedMatchups,
       weeks,
       opponents: presentOpponentTeams.map((opponentTeam) => {

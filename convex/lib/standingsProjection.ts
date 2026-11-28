@@ -10,6 +10,7 @@ type NumericStat = number | string | null | undefined;
 
 type StandingsTeamStatSource = {
   gshlTeamId: string;
+  overallRk?: NumericStat;
   powerRk?: NumericStat;
   G?: NumericStat;
   A?: NumericStat;
@@ -34,12 +35,16 @@ type StandingsMatchupSource = {
   weekId: string;
   homeTeamId: string;
   awayTeamId: string;
+  homeRank?: number | null;
+  awayRank?: number | null;
   homeScore?: number | null;
   awayScore?: number | null;
   isComplete?: boolean | null;
 };
 
 type StandingsWeekSource = {
+  startDate?: string | number | null;
+  endDate?: string | number | null;
   _id: string;
   weekNum: number | string;
 };
@@ -190,11 +195,18 @@ function weekNumber(
   return weekNumById.get(weekId) ?? Number.MAX_SAFE_INTEGER;
 }
 
-/** Selects only the two latest finals and next two games shown in the card. */
+function includesDay(week: StandingsWeekSource, today?: string) {
+  const start = utcTimestampToDateKey(week.startDate);
+  const end = utcTimestampToDateKey(week.endDate);
+  return Boolean(today && start && end && start <= today && today <= end);
+}
+
+/** Select the recent finals, active week and next scheduled opponents. */
 export function selectStandingsDetailMatchups<T extends StandingsMatchupSource>(
   teamId: string,
   matchups: readonly T[],
   weeks: readonly StandingsWeekSource[],
+  today?: string,
 ): T[] {
   const weekNumById = new Map(
     weeks.map((week) => [String(week._id), Number(week.weekNum)] as const),
@@ -211,9 +223,24 @@ export function selectStandingsDetailMatchups<T extends StandingsMatchupSource>(
         weekNumber(weekNumById, String(right.weekId)),
     );
 
+  const active = weeks.find((week) => includesDay(week, today));
+  const expired = new Set(
+    weeks
+      .filter(
+        (week) =>
+          today && (utcTimestampToDateKey(week.endDate) ?? today) < today,
+      )
+      .map((week) => String(week._id)),
+  );
   return [
     ...ordered.filter((matchup) => matchup.isComplete).slice(-2),
-    ...ordered.filter((matchup) => !matchup.isComplete).slice(0, 2),
+    ...ordered.filter((m) => !m.isComplete && m.weekId === active?._id),
+    ...ordered
+      .filter(
+        (m) =>
+          !m.isComplete && m.weekId !== active?._id && !expired.has(m.weekId),
+      )
+      .slice(0, 2),
   ];
 }
 
@@ -300,6 +327,8 @@ function projectGame(
   matchup: StandingsMatchupSource,
   weekNumById: ReadonlyMap<string, number>,
   opponentById: ReadonlyMap<string, StandingsOpponentSource>,
+  teamStats: readonly StandingsTeamStatSource[],
+  currentWeekId?: string,
 ): StandingsTeamGameContext {
   const isHome = String(matchup.homeTeamId) === teamId;
   const opponentId = String(isHome ? matchup.awayTeamId : matchup.homeTeamId);
@@ -324,7 +353,18 @@ function projectGame(
       : "Final";
   }
 
+  const rank = matchup.isComplete
+    ? isHome
+      ? matchup.awayRank
+      : matchup.homeRank
+    : numeric(
+        teamStats.find((row) => String(row.gshlTeamId) === opponentId)?.powerRk,
+      );
+  if (!matchup.isComplete && matchup.weekId === currentWeekId) {
+    resultLabel = hasScore ? `${teamScore}-${opponentScore}` : "Pending";
+  }
   return {
+    opponentRank: rank && rank > 0 ? rank : null,
     id: String(matchup._id),
     isComplete: Boolean(matchup.isComplete),
     venueLabel: isHome ? "v" : "@",
@@ -363,6 +403,8 @@ function projectTopPlayers(
 
 export function projectStandingsTeamDetail(options: {
   teamId: string;
+  today?: string;
+  seasonEnd?: string | number | null;
   owner: StandingsOwnerSource | null;
   conference: StandingsConferenceSource | null;
   teamStats: readonly StandingsTeamStatSource[];
@@ -396,6 +438,7 @@ export function projectStandingsTeamDetail(options: {
     teamId,
     matchups,
     weeks,
+    options.today,
   );
   const weekNumById = new Map(
     weeks.map((week) => [String(week._id), Number(week.weekNum)] as const),
@@ -403,17 +446,55 @@ export function projectStandingsTeamDetail(options: {
   const opponentById = new Map(
     opponents.map((opponent) => [String(opponent.id), opponent] as const),
   );
+  const currentWeek = weeks.find((week) => includesDay(week, options.today));
+  const currentId = selectedMatchups.find(
+    (m) => !m.isComplete && m.weekId === currentWeek?._id,
+  )?._id;
   const games = selectedMatchups.map((matchup) =>
-    projectGame(teamId, matchup, weekNumById, opponentById),
+    projectGame(
+      teamId,
+      matchup,
+      weekNumById,
+      opponentById,
+      teamStats,
+      currentWeek?._id,
+    ),
   );
 
   return {
+    awardRaces:
+      options.today &&
+      (utcTimestampToDateKey(options.seasonEnd) ?? "") >= options.today
+        ? (
+            [
+              ["G", "Rocket Richard"],
+              ["P", "Art Ross"],
+            ] as const
+          ).flatMap(([key, label]) => {
+            const contenders = teamStats
+              .filter((row) => (numeric(row[key]) ?? 0) > 0)
+              .sort(
+                (a, b) =>
+                  Number(b[key]) - Number(a[key]) ||
+                  (numeric(a.overallRk) ?? Infinity) -
+                    (numeric(b.overallRk) ?? Infinity) ||
+                  a.gshlTeamId.localeCompare(b.gshlTeamId),
+              )
+              .slice(0, 4);
+            return contenders.some((row) => row.gshlTeamId === teamId)
+              ? [label]
+              : [];
+          })
+        : [],
+    currentGame: games.find((game) => game.id === currentId) ?? null,
     categoryRanks: buildCategoryRanks(teamId, teamStats),
     conferenceLabel: conference?.name ?? conference?.abbr ?? "Independent",
     ownerName,
     powerRank: Number.isFinite(powerRank) && powerRank > 0 ? powerRank : null,
     previousGames: games.filter((game) => game.isComplete),
     topPlayers: projectTopPlayers(playerTotals, players),
-    upcomingGames: games.filter((game) => !game.isComplete),
+    upcomingGames: games.filter(
+      (game) => !game.isComplete && game.id !== currentId,
+    ),
   };
 }

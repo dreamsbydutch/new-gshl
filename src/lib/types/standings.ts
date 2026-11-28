@@ -38,6 +38,7 @@ export interface StandingsCategoryRank {
 export interface StandingsTeamGameContext {
   id: string;
   isComplete: boolean;
+  opponentRank?: number | null;
   venueLabel?: "v" | "@";
   opponentLogoUrl: string | null;
   opponentName: string;
@@ -59,6 +60,8 @@ export interface StandingsTeamCardViewModel {
   conferenceLabel: string;
   ownerName: string;
   powerRank: number | null;
+  awardRaces?: string[];
+  currentGame?: StandingsTeamGameContext | null;
   previousGames: StandingsTeamGameContext[];
   topPlayers: StandingsTopPlayer[];
   upcomingGames: StandingsTeamGameContext[];
