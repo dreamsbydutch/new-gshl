@@ -69,17 +69,17 @@ function StandingsGameList({
                   aria-hidden="true"
                   className="grid min-h-7 grid-cols-[auto_auto] items-center justify-center gap-x-0.5 sm:flex sm:flex-wrap sm:gap-x-1"
                 >
-                  <span className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center">
+                  <span className="relative inline-flex h-4 w-4 shrink-0 items-center justify-center sm:h-5 sm:w-5">
                     {game.opponentLogoUrl ? (
                       <Image
                         src={game.opponentLogoUrl}
                         alt=""
                         width={20}
                         height={20}
-                        className="h-5 w-5 object-contain"
+                        className="h-4 w-4 object-contain sm:h-5 sm:w-5"
                       />
                     ) : (
-                      <span className="rounded bg-slate-200 px-1 text-xs">
+                      <span className="rounded bg-slate-200 px-0.5 text-[9px]">
                         {game.opponentName.slice(0, 2).toUpperCase()}
                       </span>
                     )}
@@ -91,7 +91,11 @@ function StandingsGameList({
                   </span>
                   <span className="contents sm:flex sm:flex-none sm:flex-col sm:items-start">
                     <span className="whitespace-nowrap text-[9px] leading-3 text-slate-500">
-                      {game.weekLabel} {venue}
+                      {game.weekLabel}
+                      <span className="[@container(max-width:275px)]:hidden">
+                        {" "}
+                        {venue}
+                      </span>
                     </span>
                     {(game.isComplete || title === "Current") && (
                       <span
