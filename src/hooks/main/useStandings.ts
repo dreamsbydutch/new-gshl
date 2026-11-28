@@ -34,7 +34,7 @@ export function useStandingsTeamDetail(
   isLoading: boolean;
   error: null;
 } {
-  const { enabled = true, seasonId, teamId } = options;
+  const { enabled = true, seasonId, teamId, today } = options;
   const shouldQuery = enabled && Boolean(seasonId) && Boolean(teamId);
   const result = useQuery(
     api.standings.teamDetail,
@@ -42,6 +42,7 @@ export function useStandingsTeamDetail(
       ? {
           seasonId: seasonId as Id<"seasons">,
           teamId: teamId as Id<"teams">,
+          ...(today ? { today } : {}),
         }
       : "skip",
   );

@@ -74,6 +74,7 @@ export interface StandingsTeamCardProps {
 }
 
 export interface UseStandingsTeamDetailOptions {
+  today?: string;
   seasonId?: string | null;
   teamId?: string | null;
   enabled?: boolean;

@@ -50,6 +50,7 @@ export const teamDetail = query({
   args: {
     seasonId: v.id("seasons"),
     teamId: v.id("teams"),
+    today: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const team = await ctx.db.get(args.teamId);
@@ -120,7 +121,14 @@ export const teamDetail = query({
         ),
       ),
     ]);
-    const today = new Date().toISOString().slice(0, 10);
+    const today =
+      args.today ??
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Toronto",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
     const weeks = weekRows.filter(present);
     const seasonPlayerTotals = playerTotalPages
       .flat()

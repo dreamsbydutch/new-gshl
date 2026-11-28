@@ -1,5 +1,6 @@
 "use client";
 
+import { useLeagueToday } from "../../hooks/features/useLeagueToday";
 import Image from "next/image";
 import type {
   StandingsCategoryRanksProps,
@@ -16,6 +17,10 @@ const RESULT_TONE_CLASS = {
   tie: "text-amber-700",
   upcoming: "text-slate-600",
 } as const;
+
+function isTopEight(rank: number | null | undefined): rank is number {
+  return rank != null && Number.isInteger(rank) && rank >= 1 && rank <= 8;
+}
 
 function StandingsGameList({
   emptyLabel,
@@ -41,11 +46,13 @@ function StandingsGameList({
               game.weekLabel,
               venue === "@" ? "Away at" : venue === "v" ? "Home vs" : "Against",
               game.opponentName,
-              game.opponentRank
+              isTopEight(game.opponentRank)
                 ? "power rank " + game.opponentRank
-                : "power rank unavailable",
+                : "",
               game.resultLabel,
-            ].join(" ");
+            ]
+              .filter(Boolean)
+              .join(" ");
             return (
               <li
                 key={game.id}
@@ -71,9 +78,11 @@ function StandingsGameList({
                         {game.opponentName.slice(0, 2).toUpperCase()}
                       </span>
                     )}
-                    <span className="absolute -bottom-1 -right-2 rounded bg-white px-0.5 text-[9px] font-bold leading-tight ring-1 ring-slate-200">
-                      {game.opponentRank ? "#" + game.opponentRank : "\u2014"}
-                    </span>
+                    {isTopEight(game.opponentRank) && (
+                      <span className="absolute -bottom-1 -right-2 rounded bg-white px-0.5 text-[9px] font-bold leading-tight ring-1 ring-slate-200">
+                        #{game.opponentRank}
+                      </span>
+                    )}
                   </span>
                   {(game.isComplete || title === "Current") && (
                     <span
@@ -153,9 +162,11 @@ export function StandingsTeamCard({
   seasonCategories,
   teamId,
 }: StandingsTeamCardProps) {
+  const today = useLeagueToday();
   const { data: context, isLoading } = useStandingsTeamDetail({
     seasonId,
     teamId,
+    today,
   });
 
   if (isLoading) {
@@ -194,12 +205,14 @@ export function StandingsTeamCard({
         />
       </div>
       <div className="flex flex-wrap items-baseline gap-x-3 border-t border-slate-200 pt-1 text-[11px]">
-        {context.powerRank != null && (
+        {isTopEight(context.powerRank) && (
           <span>
             Power <b>#{context.powerRank}</b>
           </span>
         )}
-        <span className="text-slate-500">Opponent badges show power rank</span>
+        <span className="text-slate-500">
+          Badges show top-eight power ranks
+        </span>
       </div>
       <StandingsCategoryRanks
         categories={context.categoryRanks}
