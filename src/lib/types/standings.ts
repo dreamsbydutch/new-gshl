@@ -28,6 +28,7 @@ export type StandingsStatView = "standings" | "skaters" | "goalies" | "roster";
 export type StandingsTeamRow = StandingsGroup["teams"][number];
 
 export interface StandingsCategoryRank {
+  rankedTeams?: number;
   label: string;
   value: number | string | null | undefined;
   rank: number | null;
@@ -38,6 +39,7 @@ export interface StandingsCategoryRank {
 export interface StandingsTeamGameContext {
   id: string;
   isComplete: boolean;
+  opponentRank?: number | null;
   venueLabel?: "v" | "@";
   opponentLogoUrl: string | null;
   opponentName: string;
@@ -55,10 +57,13 @@ export interface StandingsTopPlayer {
 }
 
 export interface StandingsTeamCardViewModel {
+  asOfDay?: string;
   categoryRanks: StandingsCategoryRank[];
   conferenceLabel: string;
   ownerName: string;
   powerRank: number | null;
+  awardRaces?: string[];
+  currentGame?: StandingsTeamGameContext | null;
   previousGames: StandingsTeamGameContext[];
   topPlayers: StandingsTopPlayer[];
   upcomingGames: StandingsTeamGameContext[];
@@ -71,6 +76,7 @@ export interface StandingsTeamCardProps {
 }
 
 export interface UseStandingsTeamDetailOptions {
+  today?: string;
   seasonId?: string | null;
   teamId?: string | null;
   enabled?: boolean;

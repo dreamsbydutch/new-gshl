@@ -50,6 +50,7 @@ export const teamDetail = query({
   args: {
     seasonId: v.id("seasons"),
     teamId: v.id("teams"),
+    today: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const team = await ctx.db.get(args.teamId);
@@ -120,6 +121,14 @@ export const teamDetail = query({
         ),
       ),
     ]);
+    const today =
+      args.today ??
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Toronto",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
     const weeks = weekRows.filter(present);
     const seasonPlayerTotals = playerTotalPages
       .flat()
@@ -128,6 +137,7 @@ export const teamDetail = query({
       String(team._id),
       matchupRows,
       weeks,
+      today,
     );
     const opponentTeamIds = [
       ...new Set(
@@ -169,6 +179,8 @@ export const teamDetail = query({
       owner,
       conference,
       teamStats,
+      today,
+      seasonEnd: (await ctx.db.get(args.seasonId))?.endDate,
       matchups: selectedMatchups,
       weeks,
       opponents: presentOpponentTeams.map((opponentTeam) => {

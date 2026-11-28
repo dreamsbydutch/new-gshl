@@ -146,7 +146,7 @@ function StandingsGroupTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto bg-white">
+      <div className="overflow-x-auto bg-white [container-type:inline-size]">
         <table className="w-full table-auto border-collapse text-xs sm:w-max sm:table-auto sm:text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-[10px] uppercase tracking-[0.16em] text-slate-500">
@@ -307,11 +307,13 @@ function StandingsGroupTable({
                         colSpan={7 + (showConference ? 1 : 0)}
                         className="bg-white px-2 pb-3 pt-1 sm:px-4 sm:pb-4"
                       >
-                        <StandingsTeamCard
-                          seasonId={season.id}
-                          seasonCategories={season.categories}
-                          teamId={team.id}
-                        />
+                        <div className="w-full max-w-[calc(100cqi-1rem)] sm:max-w-none">
+                          <StandingsTeamCard
+                            seasonId={season.id}
+                            seasonCategories={season.categories}
+                            teamId={team.id}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ) : null}
