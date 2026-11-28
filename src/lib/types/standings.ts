@@ -57,6 +57,7 @@ export interface StandingsTopPlayer {
 }
 
 export interface StandingsTeamCardViewModel {
+  asOfDay?: string;
   categoryRanks: StandingsCategoryRank[];
   conferenceLabel: string;
   ownerName: string;

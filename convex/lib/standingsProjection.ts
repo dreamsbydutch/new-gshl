@@ -464,6 +464,7 @@ export function projectStandingsTeamDetail(options: {
   );
 
   return {
+    ...(options.today ? { asOfDay: options.today } : {}),
     awardRaces:
       options.today &&
       (utcTimestampToDateKey(options.seasonEnd) ?? "") >= options.today

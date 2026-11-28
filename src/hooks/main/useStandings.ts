@@ -36,16 +36,19 @@ export function useStandingsTeamDetail(
 } {
   const { enabled = true, seasonId, teamId, today } = options;
   const shouldQuery = enabled && Boolean(seasonId) && Boolean(teamId);
-  const result = useQuery(
+  const ids = shouldQuery
+    ? { seasonId: seasonId as Id<"seasons">, teamId: teamId as Id<"teams"> }
+    : null;
+  const snapshot = useQuery(api.standings.teamDetail, ids ?? "skip");
+  // Older deployments accept only IDs. A dated snapshot also signals that
+  // the server supports refreshing an open card across Toronto midnight.
+  const refreshDay =
+    ids && today && snapshot?.asOfDay && snapshot.asOfDay !== today;
+  const refreshed = useQuery(
     api.standings.teamDetail,
-    shouldQuery
-      ? {
-          seasonId: seasonId as Id<"seasons">,
-          teamId: teamId as Id<"teams">,
-          ...(today ? { today } : {}),
-        }
-      : "skip",
+    refreshDay ? { ...ids, today } : "skip",
   );
+  const result = refreshDay && refreshed !== undefined ? refreshed : snapshot;
 
   const needsVenueLookup = Boolean(
     result &&
