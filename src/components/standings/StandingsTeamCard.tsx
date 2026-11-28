@@ -28,8 +28,8 @@ function StandingsGameList({
   title,
 }: StandingsGameListProps) {
   return (
-    <div className="min-w-0">
-      <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+    <div className={cn("min-w-0", title === "Current" && "rounded bg-sky-50")}>
+      <p className="text-center text-[9px] font-bold uppercase leading-3 tracking-wide text-slate-500">
         {title}
       </p>
       {games.length ? (
@@ -60,18 +60,18 @@ function StandingsGameList({
                 title={description}
               >
                 <span className="sr-only">{description}</span>
-                <div aria-hidden="true" className="flex flex-col items-center">
-                  <span className="text-[10px] text-slate-500">
-                    {game.weekLabel} {venue}
-                  </span>
-                  <span className="relative my-0.5 inline-flex h-7 w-7 items-center justify-center">
+                <div
+                  aria-hidden="true"
+                  className="flex min-h-7 items-center justify-center gap-1"
+                >
+                  <span className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center">
                     {game.opponentLogoUrl ? (
                       <Image
                         src={game.opponentLogoUrl}
                         alt=""
-                        width={28}
-                        height={28}
-                        className="h-7 w-7 object-contain"
+                        width={20}
+                        height={20}
+                        className="h-5 w-5 object-contain"
                       />
                     ) : (
                       <span className="rounded bg-slate-200 px-1 text-xs">
@@ -79,21 +79,26 @@ function StandingsGameList({
                       </span>
                     )}
                     {isTopEight(game.opponentRank) && (
-                      <span className="absolute -bottom-1 -right-2 rounded bg-white px-0.5 text-[9px] font-bold leading-tight ring-1 ring-slate-200">
+                      <span className="absolute -bottom-1 -left-0.5 rounded bg-white px-0.5 text-[8px] font-bold leading-none ring-1 ring-slate-200">
                         #{game.opponentRank}
                       </span>
                     )}
                   </span>
-                  {(game.isComplete || title === "Current") && (
-                    <span
-                      className={cn(
-                        "mt-1 whitespace-nowrap text-[11px] font-semibold tabular-nums",
-                        RESULT_TONE_CLASS[game.resultTone],
-                      )}
-                    >
-                      {game.resultLabel}
+                  <span className="flex min-w-0 flex-col items-start">
+                    <span className="whitespace-nowrap text-[9px] leading-3 text-slate-500">
+                      {game.weekLabel} {venue}
                     </span>
-                  )}
+                    {(game.isComplete || title === "Current") && (
+                      <span
+                        className={cn(
+                          "whitespace-nowrap text-[10px] font-bold tabular-nums leading-3",
+                          RESULT_TONE_CLASS[game.resultTone],
+                        )}
+                      >
+                        {game.resultLabel}
+                      </span>
+                    )}
+                  </span>
                 </div>
               </li>
             );
@@ -113,47 +118,46 @@ function StandingsCategoryRanks({
   const columns = seasonCategories.length
     ? resolveMatchupCategories(seasonCategories)
     : [];
-  const ranked = columns
-    .flatMap(({ label }) => {
-      const category = categories.find((item) => item.label === label);
-      return category?.rank != null ? [category] : [];
-    })
-    .sort((a, b) => a.rank! - b.rank!);
-  if (!ranked.length)
+  if (!columns.length || !categories.length)
     return <p className="text-xs text-slate-500">No category ranks yet.</p>;
-  const best = ranked.slice(0, 2);
-  const weakest = ranked
-    .filter((item) => item.rank! > best[best.length - 1]!.rank!)
-    .slice(-2);
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-      {(
-        [
-          ["Best", best],
-          ["Lowest", weakest],
-        ] as const
-      ).map(
-        ([title, items]) =>
-          items.length > 0 && (
-            <div key={title} className="flex items-baseline gap-1">
-              <span className="font-medium text-slate-500">{title}</span>
-              {items.map((item) => (
-                <span
-                  key={item.label}
-                  className="whitespace-nowrap"
-                  title={item.label + " season value: " + item.value}
-                >
-                  {item.label}{" "}
-                  <b>
-                    {item.isTied ? "T" : "#"}
-                    {item.rank}
-                  </b>
-                </span>
-              ))}
-            </div>
-          ),
-      )}
-    </div>
+    <dl className="grid grid-cols-5 gap-x-2 gap-y-2 sm:grid-cols-[repeat(auto-fit,minmax(48px,1fr))]">
+      {columns.map(({ label }) => {
+        const category = categories.find((item) => item.label === label);
+        const rank = category?.rank;
+        const count = category?.rankedTeams;
+        const strength = rank && count ? (count - rank + 1) / count : null;
+        return (
+          <div key={label} className="min-w-0">
+            <dt className="flex items-baseline justify-between gap-0.5 text-[10px] font-bold text-slate-600">
+              {label}
+              <span className="text-[9px] font-medium text-slate-500">
+                <span className="sr-only">League rank </span>
+                {rank ? (category?.isTied ? "T" : "#") + rank : ""}
+              </span>
+            </dt>
+            <dd className="text-sm font-bold tabular-nums leading-5 text-slate-900">
+              {category?.value ?? "\u2014"}
+            </dd>
+            {strength != null && (
+              <dd aria-hidden="true" className="h-1 rounded-full bg-slate-200">
+                <div
+                  className={cn(
+                    "h-full rounded-full",
+                    strength >= 0.7
+                      ? "bg-teal-600"
+                      : strength <= 0.3
+                        ? "bg-amber-600"
+                        : "bg-sky-600",
+                  )}
+                  style={{ width: strength * 100 + "%" }}
+                />
+              </dd>
+            )}
+          </div>
+        );
+      })}
+    </dl>
   );
 }
 
@@ -186,7 +190,7 @@ export function StandingsTeamCard({
   }
 
   return (
-    <div className="space-y-1.5 rounded-md bg-slate-50 px-2 py-2">
+    <div className="space-y-2 rounded-md border border-slate-200 bg-white px-2 py-1.5">
       <div className="grid grid-cols-[2fr_1.2fr_2fr] divide-x divide-slate-200">
         <StandingsGameList
           title="Last two"
@@ -204,26 +208,31 @@ export function StandingsTeamCard({
           emptyLabel="None scheduled"
         />
       </div>
-      <div className="flex flex-wrap items-baseline gap-x-3 border-t border-slate-200 pt-1 text-[11px]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-slate-200 pt-1.5">
+        <h4 className="mr-auto text-xs font-semibold text-slate-800">
+          Season categories
+        </h4>
         {isTopEight(context.powerRank) && (
-          <span>
-            Power <b>#{context.powerRank}</b>
+          <span className="rounded bg-slate-800 px-1.5 text-[10px] font-semibold text-white">
+            Power #{context.powerRank}
           </span>
         )}
-        <span className="text-slate-500">
-          Badges show top-eight power ranks
-        </span>
+        {context.awardRaces?.map((award) => (
+          <span
+            key={award}
+            className="rounded bg-amber-50 px-1.5 text-[10px] font-semibold text-amber-900"
+            title={"Top four in the " + award + " race"}
+          >
+            <span aria-hidden="true">{"\u{1F3C6} "}</span>
+            <span className="sr-only">Award race: </span>
+            {award}
+          </span>
+        ))}
       </div>
       <StandingsCategoryRanks
         categories={context.categoryRanks}
         seasonCategories={seasonCategories}
       />
-      {!!context.awardRaces?.length && (
-        <p className="text-[11px]">
-          <span className="font-medium text-slate-500">Award races</span>{" "}
-          {context.awardRaces.join(", ")}
-        </p>
-      )}
     </div>
   );
 }

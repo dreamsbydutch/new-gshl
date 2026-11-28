@@ -28,6 +28,7 @@ export type StandingsStatView = "standings" | "skaters" | "goalies" | "roster";
 export type StandingsTeamRow = StandingsGroup["teams"][number];
 
 export interface StandingsCategoryRank {
+  rankedTeams?: number;
   label: string;
   value: number | string | null | undefined;
   rank: number | null;

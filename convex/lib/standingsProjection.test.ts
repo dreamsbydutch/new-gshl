@@ -58,6 +58,7 @@ test("category ranks share ties and exclude missing or invalid totals", () => {
       players: [],
     }).categoryRanks;
   for (const teamId of ["selected", "tied"]) {
+    assert.ok(project(teamId).every((category) => category.rankedTeams === 3));
     assert.ok(project(teamId).every((category) => category.isTied === true));
     assert.ok(project(teamId).every((category) => category.isLast === true));
     assert.deepEqual(

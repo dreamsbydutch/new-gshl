@@ -301,6 +301,7 @@ function buildCategoryRanks(
     if (selectedValue === null) return [];
 
     // Equal totals share a rank; missing values never outrank valid stats.
+    let rankedTeams = 1;
     let rank = 1;
     let isTied = false;
     let hasLowerRankedTeam = false;
@@ -308,6 +309,7 @@ function buildCategoryRanks(
       if (String(row.gshlTeamId) === teamId) continue;
       const candidate = numeric(row[key]);
       if (candidate === null) continue;
+      rankedTeams++;
       if (candidate === selectedValue) isTied = true;
       else if (
         direction === "asc"
@@ -318,7 +320,7 @@ function buildCategoryRanks(
       else hasLowerRankedTeam = true;
     }
     const isLast = rank > 1 && !hasLowerRankedTeam;
-    return [{ label, value, rank, isTied, isLast }];
+    return [{ label, value, rank, rankedTeams, isTied, isLast }];
   });
 }
 
