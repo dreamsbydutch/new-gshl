@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   nhlLeaderSchema,
+  indexDraftRosterNhlStats,
   selectQualifiedNHLGoalies,
   selectNHLLeaders,
   getNHLLeaderStat,
@@ -30,6 +31,24 @@ const player = (id: number, seconds: number, games: number) =>
       SVP: 0.9,
     },
   });
+void test("draft roster joins official stats by NHL ID and preserves zeros and goalie precision", () => {
+  const result = indexDraftRosterNhlStats(
+    {
+      seasonId: 20262027,
+      skaters: [player(1, 60, 1)],
+      goalies: [player(2, 60, 1)],
+    },
+    [
+      { id: "skater", nhlApiId: "1" },
+      { id: "goalie", nhlApiId: "2" },
+      { id: "unlinked" },
+    ],
+  );
+  assert.equal(result.get("skater")?.P, "0");
+  assert.equal(result.get("goalie")?.SVP, "0.900");
+  assert.equal(result.get("goalie")?.GAA, "2.00");
+  assert.equal(result.has("unlinked"), false);
+});
 void test("goalies require 90 total minutes at 10 team games, inclusive and before the top 20", () => {
   const players = [
     player(100, 5399, 2),
