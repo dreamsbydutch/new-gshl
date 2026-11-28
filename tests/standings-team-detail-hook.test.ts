@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
@@ -22,7 +22,7 @@ void test("team detail sends a day only when a dated server snapshot needs refre
       if (!snapshot.asOfDay) assert.deepEqual(args, ids);
       return {
         localQueryResult: () => snapshot,
-        onUpdate: () => () => {},
+        onUpdate: () => () => undefined,
       };
     },
   );
