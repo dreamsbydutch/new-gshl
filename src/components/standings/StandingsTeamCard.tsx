@@ -28,7 +28,7 @@ function StandingsGameList({
         {title}
       </p>
       {games.length ? (
-        <ul className="flex flex-wrap gap-x-4 gap-y-1">
+        <ul className="space-y-1">
           {games.map((game) => {
             // Older query responses carry venue only in upcoming result labels.
             const venue =
@@ -45,7 +45,7 @@ function StandingsGameList({
               <li
                 key={game.id}
                 title={`${weekLabel}: ${venueDescription} ${game.opponentName}`}
-                className="flex flex-col gap-0.5"
+                className="rounded bg-white px-2 py-1"
               >
                 <div className="flex min-h-7 items-center gap-1.5">
                   <span className="sr-only">{venueDescription}</span>
@@ -55,20 +55,22 @@ function StandingsGameList({
                   {game.opponentLogoUrl ? (
                     <Image
                       src={game.opponentLogoUrl}
-                      alt={game.opponentName}
+                      alt=""
                       width={24}
                       height={24}
                       className="h-6 w-6 shrink-0 object-contain"
                     />
                   ) : (
                     <span
-                      role="img"
-                      aria-label={game.opponentName}
+                      aria-hidden="true"
                       className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[9px] font-semibold text-slate-600"
                     >
                       {game.opponentName.slice(0, 2).toUpperCase()}
                     </span>
                   )}
+                  <span className="min-w-0 flex-1 break-words text-xs text-slate-700">
+                    {game.opponentName}
+                  </span>
                   {game.isComplete ? (
                     <span
                       className={cn(
@@ -105,23 +107,21 @@ function StandingsCategoryRanks({
         Category ranks
       </p>
       {columns.length ? (
-        <dl
-          className="grid gap-0.5"
-          style={{
-            gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
-          }}
-        >
+        <dl className="grid grid-cols-3 gap-1 sm:grid-cols-5">
           {columns.map(({ label }) => {
             const category = categories.find((item) => item.label === label);
             return (
               <div
                 key={label}
                 title={`${label}: ${category?.value ?? "—"}`}
-                className="flex min-w-0 flex-col items-center gap-0.5"
+                className="min-w-0 rounded bg-white px-2 py-1.5"
               >
-                <dt className="order-2 text-[9px] text-slate-500 sm:text-[10px]">
+                <dt className="text-[10px] text-slate-500 sm:text-[10px]">
                   {label}
                 </dt>
+                <dd className="text-sm font-semibold tabular-nums text-slate-900">
+                  {category?.value ?? "\u2014"}
+                </dd>
                 <dd
                   className={cn(
                     "font-mono text-[10px] font-semibold tabular-nums text-slate-800 sm:text-xs",
@@ -175,7 +175,7 @@ export function StandingsTeamCard({
 
   return (
     <div className="space-y-2 rounded-md bg-slate-50 px-3 py-2.5">
-      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <StandingsGameList
           title="Past games"
           games={context.previousGames}
