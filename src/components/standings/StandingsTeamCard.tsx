@@ -28,7 +28,12 @@ function StandingsGameList({
   title,
 }: StandingsGameListProps) {
   return (
-    <div className={cn("min-w-0", title === "Current" && "rounded bg-sky-50")}>
+    <div
+      className={cn(
+        "min-w-0",
+        title === "Current" ? "rounded bg-sky-50" : "col-span-2",
+      )}
+    >
       <p className="text-center text-[9px] font-bold uppercase leading-3 tracking-wide text-slate-500">
         {title}
       </p>
@@ -62,7 +67,7 @@ function StandingsGameList({
                 <span className="sr-only">{description}</span>
                 <div
                   aria-hidden="true"
-                  className="flex min-h-7 flex-wrap items-center justify-center gap-x-1 gap-y-0.5"
+                  className="grid min-h-7 grid-cols-[auto_auto] items-center justify-center gap-x-0.5 sm:flex sm:flex-wrap sm:gap-x-1"
                 >
                   <span className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center">
                     {game.opponentLogoUrl ? (
@@ -79,19 +84,19 @@ function StandingsGameList({
                       </span>
                     )}
                     {isTopEight(game.opponentRank) && (
-                      <span className="absolute -bottom-1 -left-0.5 rounded bg-white px-0.5 text-[8px] font-bold leading-none ring-1 ring-slate-200">
+                      <span className="absolute -bottom-px -left-0.5 rounded bg-white px-0.5 text-[8px] font-bold leading-none ring-1 ring-slate-200">
                         #{game.opponentRank}
                       </span>
                     )}
                   </span>
-                  <span className="flex flex-none flex-col items-start">
+                  <span className="contents sm:flex sm:flex-none sm:flex-col sm:items-start">
                     <span className="whitespace-nowrap text-[9px] leading-3 text-slate-500">
                       {game.weekLabel} {venue}
                     </span>
                     {(game.isComplete || title === "Current") && (
                       <span
                         className={cn(
-                          "whitespace-nowrap text-[10px] font-bold tabular-nums leading-3",
+                          "col-span-2 whitespace-nowrap text-center text-[10px] font-bold tabular-nums leading-3",
                           RESULT_TONE_CLASS[game.resultTone],
                         )}
                       >
@@ -191,7 +196,7 @@ export function StandingsTeamCard({
 
   return (
     <div className="space-y-2 rounded-md border border-slate-200 bg-white px-2 py-1.5">
-      <div className="grid grid-cols-[2fr_1.2fr_2fr] divide-x divide-slate-200">
+      <div className="grid grid-cols-5 divide-x divide-slate-200">
         <StandingsGameList
           title="Last two"
           games={context.previousGames}
