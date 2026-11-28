@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { DatabaseReader } from "../_generated/server";
-import { loadUfaCatalog } from "./ufaCatalog";
+import { loadLatestNhlStats, loadUfaCatalog } from "./ufaCatalog";
 
 type Row = Record<string, unknown> & { _id: string };
 type Equality = { field: string; value: unknown };
@@ -22,6 +22,7 @@ type QueryBuilder = {
     applyRange: (range: IndexRange) => IndexRange,
   ) => QueryBuilder;
   collect: () => Promise<Row[]>;
+  first: () => Promise<Row | null>;
 };
 
 const INDEX_REQUIREMENTS: Record<string, { index: string; field: string }> = {
@@ -43,7 +44,11 @@ function createStrictFakeDb(tables: Record<string, Row[]>) {
       let index: string | null = null;
       let equality: Equality | null = null;
       let collected = false;
+      let playerEquality: Equality | undefined;
       const builder: QueryBuilder = {
+        async first() {
+          return (await builder.collect())[0] ?? null;
+        },
         withIndex(indexName, applyRange) {
           if (index !== null) {
             throw new Error(`withIndex called twice for ${table}`);
@@ -52,6 +57,10 @@ function createStrictFakeDb(tables: Record<string, Row[]>) {
           const range: IndexRange = {
             eq(field, value) {
               if (equality !== null) {
+                if (index === "by_seasonId_playerId" && field === "playerId") {
+                  playerEquality = { field, value };
+                  return range;
+                }
                 throw new Error(`Multiple index equalities for ${table}`);
               }
               equality = { field, value };
@@ -67,7 +76,10 @@ function createStrictFakeDb(tables: Record<string, Row[]>) {
 
           const requirement = INDEX_REQUIREMENTS[table];
           if (requirement) {
-            if (index !== requirement.index) {
+            if (
+              index !== requirement.index &&
+              !(table === "playerNhlStatLines" && playerEquality)
+            ) {
               throw new Error(
                 `${table} must use ${requirement.index}, received ${String(index)}`,
               );
@@ -82,7 +94,9 @@ function createStrictFakeDb(tables: Record<string, Row[]>) {
           }
 
           reads.push({ table, index, equality });
-          const rows = tables[table] ?? [];
+          const rows = (tables[table] ?? []).filter(
+            (row) => !playerEquality || row.playerId === playerEquality.value,
+          );
           const filter = equality;
           return filter
             ? rows.filter((row) => row[filter.field] === filter.value)
@@ -183,4 +197,28 @@ void test("loads the UFA catalog with bounded season-scoped reads", async () => 
     ),
   );
   assert.deepEqual(fake.gets, []);
+  fake.reads.length = 0;
+  const db = fake.db as unknown as DatabaseReader;
+  const home = await loadUfaCatalog(db, true);
+  assert.deepEqual(readsFor(fake.reads, "playerNhlStatLines"), []);
+  for (const [playerId, expected] of [
+    ["player-active", ["nhl-stat-latest"]],
+    ["absent", []],
+  ] as const) {
+    fake.reads.length = 0;
+    const stats = await loadLatestNhlStats(
+      db,
+      home.allOrderedSeasons,
+      home.signingSeason,
+      [playerId],
+    );
+    assert.deepEqual(
+      stats.map((row) => row._id),
+      expected,
+    );
+    assert.deepEqual(
+      fake.reads.map((read) => read.index),
+      ["by_seasonId", "by_seasonId", "by_seasonId_playerId"],
+    );
+  }
 });
