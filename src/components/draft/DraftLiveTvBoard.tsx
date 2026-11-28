@@ -7,7 +7,7 @@ import { TeamRosterCard } from "./DraftRosterBoard";
 
 export function DraftLiveTvBoard() {
   const draft = useDraftLiveTvBoard();
-  const roster = useDraftRosterBoard();
+  const roster = useDraftRosterBoard({ includeNhlStats: false });
   const status = draft.state?.status ?? "unavailable";
   const upcoming = status === "upcoming";
   const complete = status === "complete";

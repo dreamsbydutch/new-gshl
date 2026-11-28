@@ -4,6 +4,9 @@ import { buildDraftPlayerCatalog } from "@gshl-utils/features/draft-board-list";
 import { useDraftSeason } from "./useDraftSeason";
 
 import { useMemo } from "react";
+import { useNHLLeaders } from "../main/useNHL";
+import { toNHLSeasonId } from "@gshl-utils/features/nhl";
+import { indexDraftRosterNhlStats } from "@gshl-utils/features/nhl-leaders";
 import { groupRemainingDraftPicksByFranchise } from "@gshl-utils/features/draft-tv";
 import type { DraftRosterBoardViewModel } from "@gshl-types";
 import {
@@ -21,7 +24,7 @@ import {
   useTeams,
 } from "@gshl-hooks";
 
-export function useDraftRosterBoard(): DraftRosterBoardViewModel {
+export function useDraftRosterBoard({ includeNhlStats = true } = {}): DraftRosterBoardViewModel {
   const {
     seasons,
     season,
@@ -32,10 +35,25 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
   const playersQuery = usePlayers({ isActive: true });
   const contractsQuery = useContracts();
   const nhlTeamsQuery = useNHLTeams();
-  const nhlStatsQuery = useLatestPlayerNhlStats(
-    season?.id,
-    Boolean(season?.id),
+  const nhlSeasonId = includeNhlStats ? toNHLSeasonId(season?.year) : undefined;
+  const current = useNHLLeaders(nhlSeasonId);
+  const beforeSeason =
+    current.data &&
+    !current.data.skaters.length &&
+    !current.data.goalies.length;
+  const previous = useNHLLeaders(
+    beforeSeason && nhlSeasonId ? nhlSeasonId - 10001 : undefined,
   );
+  const source = beforeSeason ? previous : current;
+  const report = source.data;
+  const useStoredStats = Boolean(
+    includeNhlStats && season?.id &&
+      (!nhlSeasonId ||
+        (!source.isLoading &&
+          !report?.skaters.length &&
+          !report?.goalies.length)),
+  );
+  const nhlStatsQuery = useLatestPlayerNhlStats(season?.id, useStoredStats);
   const draftPicksQuery = useDraftPicks({
     seasonId: season?.id,
     enabled: Boolean(season?.id),
@@ -52,8 +70,18 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
   );
   const nhlTeams = nhlTeamsQuery.data;
   const latestNhlStatsByPlayer = useMemo(
-    () => indexLatestUfaNhlStats(nhlStatsQuery.data, seasons, season?.year),
-    [nhlStatsQuery.data, season?.year, seasons],
+    () =>
+      report && !useStoredStats
+        ? indexDraftRosterNhlStats(report, playersQuery.data)
+        : indexLatestUfaNhlStats(nhlStatsQuery.data, seasons, season?.year),
+    [
+      report,
+      useStoredStats,
+      playersQuery.data,
+      nhlStatsQuery.data,
+      season?.year,
+      seasons,
+    ],
   );
   const availablePlayers = useMemo(
     () =>
@@ -96,6 +124,7 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
       playersQuery.isLoading ||
       contractsQuery.isLoading ||
       draftPicksQuery.isLoading ||
+      source.isLoading ||
       nhlStatsQuery.isLoading ||
       nhlTeamsQuery.isLoading,
   };

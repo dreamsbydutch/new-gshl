@@ -1,5 +1,40 @@
 import { z } from "zod";
 import type { NHLLeader, NHLLeaderStat } from "../../types/nhl-leaders";
+import type { NHLLeaders } from "../../types/nhl-leaders";
+import type { UfaStatView } from "../../types/ufa";
+
+export function indexDraftRosterNhlStats(
+  report: NHLLeaders,
+  players: readonly { id: string; nhlApiId?: string | null }[],
+) {
+  const byNhlId = new Map<number, UfaStatView>();
+  for (const { id, stats } of report.skaters) {
+    byNhlId.set(id, {
+      GP: String(stats.GP),
+      G: String(stats.G),
+      A: String(stats.A),
+      P: String(stats.P),
+      PPP: String(stats.PPP),
+      SOG: String(stats.SOG),
+      HIT: String(stats.HIT),
+      BLK: String(stats.BLK),
+    });
+  }
+  for (const { id, stats } of report.goalies) {
+    byNhlId.set(id, {
+      GP: String(stats.GP),
+      W: String(stats.W),
+      GAA: stats.GAA?.toFixed(2),
+      SVP: stats.SVP?.toFixed(3),
+    });
+  }
+  const byPlayerId = new Map<string, UfaStatView>();
+  for (const player of players) {
+    const stats = byNhlId.get(Number(player.nhlApiId));
+    if (stats) byPlayerId.set(String(player.id), stats);
+  }
+  return byPlayerId;
+}
 
 export const NHL_LEADERS_REFRESH_SECONDS = 600;
 export const nhlLeaderSchema = z.object({
